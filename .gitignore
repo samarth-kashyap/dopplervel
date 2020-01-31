@@ -1,2 +1,5 @@
 .ipynb_checkpoints/*
 *.fits
+*.txt
+*.npz
+*.pkl
