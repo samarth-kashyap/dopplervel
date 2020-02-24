@@ -20,7 +20,7 @@ ellArr, emmArr = arrFile['ellArr'], arrFile['emmArr']
 ulmo, vlmo, wlmo = almFile['ulm'], almFile['vlm'], almFile['wlm']
 ulmA, vlmA, wlmA = almAFile['ulm'], almAFile['vlm'], almAFile['wlm']
 
-lmaxCalc = 30
+lmaxCalc = 40
 uoG, voG, woG = ps(ulmo, vlmo, wlmo, lmaxCalc, ellArr)
 uAG, vAG, wAG = ps(ulmA, vlmA, wlmA, lmaxCalc, ellArr)
 
@@ -74,7 +74,7 @@ plt.show()
 totpowo = np.sqrt( abs(uoG)**2 + abs(voG)**2 + abs(woG)**2 )
 totpowA = np.sqrt( abs(uAG)**2 + abs(vAG)**2 + abs(wAG)**2 )
 _max = max(abs(totpowo).max(), abs(totpowo).min())
-fac = 2.2
+fac = 2.0
 
 plt.figure()
 plt.subplot(131)

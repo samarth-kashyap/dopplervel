@@ -3,3 +3,6 @@
 *.txt
 *.npz
 *.pkl
+*~
+*.log
+*.pyc
