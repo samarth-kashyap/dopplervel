@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -N HMIprocessImg
+#PBS -l nodes=1:ppn=12
+#PBS -o /home/samarth/dopplervel2/opimg.log
+#PBS -e /home/samarth/dopplervel2/erimg.log
+#PBS -l walltime=24:00:00
+
+cd $PBS_O_WORKDIR
+echo $PBS_JOBID
+export TERM=xterm
+echo "Starting at "`date`
+/usr/local/bin/pbsdsh $HOME/anaconda3/bin/python $PBS_O_WORKDIR/hathaway.py --hpc
+echo "Finished at "`date`
