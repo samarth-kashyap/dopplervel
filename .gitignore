@@ -7,3 +7,5 @@
 *.log
 *.pyc
 *#
+*.temp
+*.first
