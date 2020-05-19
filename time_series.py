@@ -8,6 +8,27 @@ import argparse
 import time
 import os
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--hpc', help="Run program on daahpc",
+                    action="store_true")
+parser.add_argument('--cchpc', help="Run program on cchpc19",
+                    action="store_true")
+args = parser.parse_args()
+
+if args.hpc:
+    home_dir = "/home/samarth/"
+    scratch_dir = "/scratch/samarth/"
+if args.cchpc:
+    home_dir = "/home/g.samarth/"
+    scratch_dir = "/scratch/g.samarth/"
+else:
+    home_dir = "/home/samarthgk/cchpchome/"
+    scratch_dir = "/home/samarthgk/cchpcscratch/"
+
+data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
+NTIME = 300
+
+
 def load_time_series(NTIME, data_dir):
     '''Loads time series of alms by reading alms of each image.
 
@@ -107,28 +128,133 @@ def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s):
     wfreq_st = wfreq[mask, :]
 
     return ufreq_st, vfreq_st, w_freq_st
- 
+
+
+def get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax):
+    '''Takes the spectral coefficients and returns an array for a given s
+
+    Parameters:
+    -----------
+    ufreq - np.ndarray(ndim=2, dtype=complex)
+        frequency series of radial spherical harmonic
+    vfreq - np.ndarray(ndim=2, dtype=complex)
+        frequency series of poloidal spherical harmonic
+    wfreq - np.ndarray(ndim=2, dtype=complex)
+        frequency series of toroidal spherical harmonic
+    ellArr - np.ndarray(ndim=1, dtype=int)
+        list of ell values 
+    emmArr - np.ndarray(ndim=1, dtype=int)
+        list of emm values 
+    lmax - int 
+        maximum value of ell upto which power is summed
+
+    Returns:
+    --------
+    ufreq_st - np.ndarray(ndim=2, dtype=complex)
+        frequency series of radial spherical harmonic for s, t
+    vfreq_st - np.ndarray(ndim=2, dtype=complex)
+        frequency series of poloidal spherical harmonic for s, t
+    wfreq_st - np.ndarray(ndim=2, dtype=complex)
+        frequency series of toroidal spherical harmonic for s, t
+
+    '''
+    len_alm = ufreq.shape[0]
+    len_omega = ufreq.shape[1]
+#    lmax = hp.sphtfunc.Alm.getlmax(len_alm)
+    ufreq_st = np.zeros((lmax+1, len_omega))
+    vfreq_st = np.zeros((lmax+1, len_omega))
+    wfreq_st = np.zeros((lmax+1, len_omega))
+    """
+    for ess in range(lmax+1):
+        for tee in range(ess+1):
+            st = int(ess - tee)
+            isess = ellArr==ess
+            istee = emmArr==tee
+            mask = isess * istee
+            ufreq_st[st, :] += abs(ufreq[mask, :]).flatten()
+            vfreq_st[st, :] += abs(vfreq[mask, :]).flatten()
+            wfreq_st[st, :] += abs(wfreq[mask, :]).flatten()
+    """
+    for st in range(lmax+1):
+        mask = (ellArr - emmArr == st) * (ellArr<lmax) * (ellArr>=lmin)
+        ufreq_st[st, :] += abs(ufreq[mask, :]).sum(axis=0)
+        vfreq_st[st, :] += abs(vfreq[mask, :]).sum(axis=0)
+        wfreq_st[st, :] += abs(wfreq[mask, :]).sum(axis=0)
+    return ufreq_st, vfreq_st, wfreq_st
+
+def plot_all(ust, vst, wst, lmin, lmax):
+    xst = np.arange(lmax+1)
+    plt.figure(figsize=(10, 10))
+    plt.title(f" Total power summed over smin = {lmin}, smax = {lmax}")
+    plt.rcParams.update({'font.size': 20})
+    plt.semilogy(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
+    plt.semilogy(xst, vst.sum(axis=1)/NTIME, 'r', label='poloidal')
+    plt.semilogy(xst, wst.sum(axis=1)/NTIME, 'b', label='toroidal')
+    plt.xlabel("$s - |t|$")
+    plt.ylabel("Total Power in ms$^{-1}$")
+    plt.legend()
+    plot_fname = data_dir + "st_log_"+str(lmin)+"_"+str(lmax)+".png"
+    print(f"Saving plot to {plot_fname}")
+    plt.savefig(plot_fname)
+    plt.close()
+
+    plt.figure(figsize=(10, 10))
+    plt.rcParams.update({'font.size': 20})
+    plt.title(f" Total power summed over smin = {lmin}, smax = {lmax}")
+    plt.plot(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
+    plt.plot(xst, vst.sum(axis=1)/NTIME, 'r', label='poloidal')
+    plt.plot(xst, wst.sum(axis=1)/NTIME, 'b', label='toroidal')
+    plt.xlabel("$s - |t|$")
+    plt.ylabel("Total Power in ms$^{-1}$")
+    plt.legend()
+    plot_fname = data_dir + "st_"+str(lmin)+"_"+str(lmax)+".png"
+    print(f"Saving plot to {plot_fname}")
+    plt.savefig(plot_fname)
+    plt.close()
+    return None
+
+def plot_freq(ust, vst, wst):
+    plt.figure(figsize=(30, 20))
+    plt.rcParams.update({'font.size': 15})
+    plt.subplot(311)
+    im = plt.imshow(ust, aspect=11/smax,
+                extent=[-5.753,5.753, ust.shape[0], 0])
+    plt.xlabel("$\sigma$ in $\mu$Hz")
+    plt.ylabel("$s - |t|$")
+    plt.title("radial")
+    plt.colorbar(im)
+
+    plt.subplot(312)
+    im = plt.imshow(vst, aspect=11/smax,
+                extent=[-5.753, 5.753, vst.shape[0], 0])
+    plt.xlabel("$\sigma$ in $\mu$Hz")
+    plt.ylabel("$s - |t|$")
+    plt.title("poloidal")
+    plt.colorbar(im)
+
+    plt.subplot(313)
+    im = plt.imshow(wst, aspect=11/smax, 
+                    extent=[-5.753, 5.753, wst.shape[0], 0])
+    plt.xlabel("$\sigma$ in $\mu$Hz")
+    plt.ylabel("$s - |t|$")
+    plt.title("toroidal")
+    plt.colorbar(im)
+    plt.tight_layout()
+    plt.show()
+    return None
+
+def analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax):
+    num_blocks = int(lmax/block_size)
+    lmin, lmax = 0, 0
+    for i in range(num_blocks-1):
+        print(f"Block number = {i+1} of {num_blocks-1}")
+        lmin = lmax
+        lmax = lmin + block_size
+        ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, lmin, lmax)
+        plot_all(ust, vst, wst, lmin, lmax)
+    return None
+
 if __name__=="__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--hpc', help="Run program on daahpc",
-                        action="store_true")
-    parser.add_argument('--cchpc', help="Run program on cchpc19",
-                        action="store_true")
-    args = parser.parse_args()
-
-    if args.hpc:
-        home_dir = "/home/samarth/"
-        scratch_dir = "/scratch/samarth/"
-    if args.cchpc:
-        home_dir = "/home/g.samarth/"
-        scratch_dir = "/scratch/g.samarth/"
-    else:
-        home_dir = "/home/samarthgk/cchpchome/"
-        scratch_dir = "/home/samarthgk/cchpcscratch/"
-
-    data_dir = scratch_dir + "HMIDATA/data_analysis/"
-
-    NTIME = 365
     max_time = NTIME*24*3600 # total time in seconds
     time_arr = np.linspace(0, max_time, NTIME)
     dtime = time_arr[1] - time_arr[0]
@@ -136,13 +262,18 @@ if __name__=="__main__":
     dfreq = freq_arr[1] - freq_arr[0]
 
     utime, vtime, wtime = load_time_series(NTIME, data_dir)
+    length_alm = utime.shape[0]
+    lmax = hp.sphtfunc.Alm.getlmax(length_alm)
+    ellArr, emmArr = hp.sphtfunc.Alm.getlm(lmax)
+    """
     ufreq = np.fft.fft(utime, axis=1, norm="ortho")
     vfreq = np.fft.fft(vtime, axis=1, norm="ortho")
     wfreq = np.fft.fft(wtime, axis=1, norm="ortho")
+    np.save(data_dir + "ufreq.npy", ufreq)
+    np.save(data_dir + "vfreq.npy", vfreq)
+    np.save(data_dir + "wfreq.npy", wfreq)
+    np.save(data_dir + "freq.npy", freq_arr)
 
-    length_alm = ufreq.shape[0]
-    lmax = hp.sphtfunc.Alm.getlmax(length_alm)
-    ellArr, emmArr = hp.sphtfunc.Alm.getlm(lmax)
 
     _max = abs(ufreq).max()
 
@@ -151,3 +282,10 @@ if __name__=="__main__":
                     vmax=_max/100, vmin=-_max/100, cmap="seismic")
     plt.colorbar(im)
     plt.show()
+    """
+
+    block_size = 100
+    analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
+#    smax = 140
+#    ust, vst, wst = get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, smax)
+#    ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, smax)

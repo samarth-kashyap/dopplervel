@@ -226,22 +226,23 @@ def alm4nside(ulm, vlm, wlm, ellArr, emmArr, nside):
 
 if __name__=="__main__":
     workingDir = scratch_dir + "matrixA/"
-    data_dir = scratch_dir + "HMIDATA/data_analysis/"
+    data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
+    data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
     th_dir = home_dir + "dopplervel2/"
     if args.gnup:
         suffix = str(args.gnup).zfill(3) + ".npz"
     else:
         suffix = ".npz"
-    fname = data_dir + "alm.data.inv" + suffix
+    fname = data_dir_read + "alm.data.inv" + suffix
     alm = np.load(fname)
-    ellArr = np.load(data_dir + "ellArr.txt.npz")['ellArr']
-    emmArr = np.load(data_dir + "ellArr.txt.npz")['ellArr']
+    ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
+    emmArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
     ulm2 = alm['ulm']
     vlm2 = alm['vlm']
     wlm2 = alm['wlm']
 
-    lmax_calc = 500
-    NSIDE = 128
+    lmax_calc = 1535
+    NSIDE = 1024
     LMAXHP = 3*NSIDE - 1
     SPIN = 1
 #    ellArr, emmArr = get_ell_emm_arr(LMAXHP)
@@ -286,13 +287,14 @@ if __name__=="__main__":
     wth = np.loadtxt(th_dir + "blue.csv", delimiter=",")
 
     fac = 2.8
-    plt.figure()
+    plt.rcParams.update({'font.size': 15})
+    plt.figure(figsize=(20, 10))
     plt.loglog(uth[:, 0], uth[:, 1],'g', label='radial')
     plt.loglog(vth[:, 0], vth[:, 1],'r', label='poloidal')
     plt.loglog(wth[:, 0], wth[:, 1],'b', label='toroidal')
-    plt.loglog(fac*upow, '--g')
-    plt.loglog(fac*vpow, '--r')
-    plt.loglog(fac*wpow, '--b')
+    plt.loglog(fac*upow[:lmax_calc], '--g')
+    plt.loglog(fac*vpow[:lmax_calc], '--r')
+    plt.loglog(fac*wpow[:lmax_calc], '--b')
     plt.legend()
-    plt.savefig(data_dir + "ps.png")
+    plt.savefig(data_dir + "ps"+suffix+".png")
     plt.show()

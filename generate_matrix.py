@@ -17,10 +17,6 @@ parser.add_argument('--cchpc', help="Run program on cchpc19",
                     action="store_true")
 parser.add_argument('--gnup', help="Argument for GNU Parallel",
                     type=int)
-parser.add_argument('--synth', help="Invert for synthetic data",
-                    action="store_true")
-parser.add_argument('--read', help="Read matrix from file (for synthetic)",
-                    action="store_true")
 parser.add_argument('--fat', help="Use fat matrix for inversion",
                     action="store_true")
 parser.add_argument('--l1', help="L1 minimization - LASSO",
@@ -707,57 +703,20 @@ def computePS(alm, lmax, ellArr, emmArr):
 if __name__=="__main__":
     print("loading files --")
     workingDir = scratch_dir + "matrixA/lmax1535/"
-    if args.synth:
-        workingDir = scratch_dir + "matrixA/lmax1535/"
-    else:
-        workingDir = scratch_dir + "matrixA/synth/"
-    data_dir = scratch_dir + "HMIDATA/data_analysis/"
+    data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
     data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
 
-    if args.synth:
-        # synthetic data has both true and observed alms
-        arrFile = np.load("arrlm.npz")# contains arrays of ell and emm
-        almFile = np.load("alm.npz")  # contains arrays of alms - observed
-        almAFile = np.load("almA.npz")# contains arrays of alms - theoretical
-        # loading ell and emm arrays
-        ellArr = arrFile['ellArr']
-        emmArr = arrFile['emmArr']
-        # loading alms - observed
-        ulmo = almFile['ulm']
-        vlmo = almFile['vlm']
-        wlmo = almFile['wlm']
-        # loading alms - theoretical
-        ulmAth = almAFile['ulm']
-        vlmAth = almAFile['vlm']
-        wlmAth = almAFile['wlm']
-    else:
-        # real data has only observed alms
-        ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
-        emmArr = np.load(data_dir_read + "emmArr.txt.npz")['emmArr']
-        # loading alms - observed
-        if args.gnup:
-            suffix = str(args.gnup).zfill(3) + ".txt.npz"
-        else:
-            suffix = ".txt.npz"
-        ulmo = np.load(data_dir_read + "ulm" + suffix)['ulm']
-        vlmo = np.load(data_dir_read + "vlm" + suffix)['vlm']
-        wlmo = np.load(data_dir_read + "wlm" + suffix)['wlm']
-
+    # real data has only observed alms
+    ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
+    emmArr = np.load(data_dir_read + "emmArr.txt.npz")['emmArr']
+    # loading alms - observed
     print("loading files -- complete")
 
-    ulmA = np.zeros(ulmo.shape[0], dtype=complex)
-    vlmA = np.zeros(ulmo.shape[0], dtype=complex)
-    wlmA = np.zeros(ulmo.shape[0], dtype=complex)
-
     lmaxData = int(ellArr.max())
+    lmaxCalc = 1535
 
-    if args.synth:
-        lmaxCalc = 75
-        thSize = 150
-    else:
-        lmaxCalc = 1535
-        thSize = int(lmaxCalc * 1.2)
     ell = np.arange(lmaxCalc)
+    thSize = int(lmaxCalc * 1.3)
     phSize = 2*thSize
     theta = np.linspace(1e-5, pi/2 - 1e-5, thSize)
     phi = np.linspace(1e-5, 2*pi - 1e-5, phSize)
@@ -771,277 +730,19 @@ if __name__=="__main__":
     print("computing for .... ")
     t0 = time.time()
 
-    for t in range(lmaxCalc):
-        t1 = time.time()
-        if args.synth:
-            if args.fat:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fatMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_fat_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fatMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_SVD(A, 1e4)
-            else:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fullMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_full_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fullMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_reg1supp(A, 1e-3)
-        else:
-            """
-            if args.fat:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fatMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_fat_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fatMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_SVD(A, 1e4)
-            else:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fullMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_full_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fullMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_reg1supp(A, 1e-3)
-            """
-            A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
-            Ainv = inv_reg1supp(A, 1e-3)
-#            Ainv = np.load(workingDir + "Ainv"+str(t).zfill(4)+".npz")['A']
+    t = args.gnup
+    t1 = time.time()
+    if args.fat:
+        A = gen_fat_mat3_real(t, lmaxCalc, theta)
+        np.savez_compressed(workingDir
+                            + "fatMat"+str(t).zfill(4)+".npz",
+                            A=A)
 #        Ainv = inv_SVD(A, 1e4)
-
-        ulmt = get_only_t(lmaxCalc, t, ulmo, ellArr, emmArr)
-        vlmt = get_only_t(lmaxCalc, t, vlmo, ellArr, emmArr)
-        wlmt = get_only_t(lmaxCalc, t, wlmo, ellArr, emmArr)
-
-        if args.fat:
-            uot = ulmt
-        else:
-            uot = np.concatenate((ulmt, vlmt, 1j*wlmt), axis=0)
-
-        assert uot.shape[0] == A.shape[0] == Ainv.shape[0]
-
-        if args.l1:
-            clf = sklin.Lasso(alpha=1e-4, max_iter=10000)
-            clf.fit(A, uot.real)
-            uAt1 = clf.coef_
-            clf.fit(A, uot.imag)
-            uAt2 = clf.coef_
-            uAt = uAt1 + 1j*uAt2
-            del uAt1, uAt2
-            t2 = clf.intercept_
-        else:
-            uAt = Ainv.dot(uot)
-        """
-        A2 = A.dot(Ainv)
-        m1 = -A2 + np.identity(A2.shape[0])
-        x0 = Ainv.dot( m1.dot(uot) )
-        x1 = m1.dot( x0 )
-
-        uAt += x0 + x1
-        """
-        uA = deconcat(uAt)
-
-        ulmA = put_only_t(lmaxCalc, t, uA[0], ulmA, ellArr, emmArr)
-        vlmA = put_only_t(lmaxCalc, t, uA[1], vlmA, ellArr, emmArr)
-        wlmA = put_only_t(lmaxCalc, t, uA[2], 1j*wlmA, ellArr, emmArr)
-        
-        t2 = time.time()
-        if t%20==0:
-            print(f"Time taken for t = {t}: {(t2-t1)/60:.3f} min,"\
-                  + f"({(t2-t0)/60:.3f} min)")
+    else:
+        A = gen_full_mat3_real(t, lmaxCalc, theta)
+        np.savez_compressed(workingDir
+                            + "fullMat"+str(t).zfill(4)+".npz",
+                            A=A)
+#        Ainv = inv_reg1supp(A, 1e-3)
     tn = time.time()
     print(f"Total time taken = {(tn-t0)/60:.3f} minutes")
-
-    if args.synth:
-        np.savez("almInv.npz", ulm=ulmA, vlm=vlmA, wlm=wlmA)
-    else:
-        if args.gnup:
-            suffix = str(args.gnup).zfill(3) + ".npz"
-        else:
-            suffix = ".npz"
-        fname = data_dir + "alm.data.inv" + suffix
-        np.savez(fname, ulm=ulmA, vlm=vlmA, wlm=wlmA)
-
-    psu = computePS(ulmA, lmaxCalc, ellArr, emmArr)
-    psv = computePS(vlmA, lmaxCalc, ellArr, emmArr)
-    psw = computePS(wlmA, lmaxCalc, ellArr, emmArr)
-    np.savez_compressed(data_dir + "power.rot" + suffix,
-                        upow=psu, vpow=psv, wpow=psw)
-    pstot = np.sqrt( psu**2 + psv**2 + psw**2 )
-
-#    urA, utA, upA = vel_from_spectra_allt(ulmA, vlmA, wlmA,
-#                                    thSize, phSize, lmaxCalc)
-
-    if not args.synth:
-        plt.figure()
-        plt.loglog(psu, 'g', label='radial')
-        plt.loglog(psv, 'r', label='poloidal')
-        plt.loglog(psw, 'b', label='toroidal')
-        plt.xlabel('$l$')
-        plt.ylabel('velocity $ms^{-1}$')
-        plt.legend()
-        plt.show()
-    
-    if args.synth:
-        psuth = computePS(ulmAth, lmaxCalc, ellArr, emmArr)
-        psvth = computePS(vlmAth, lmaxCalc, ellArr, emmArr)
-        pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
-        pstotth = np.sqrt( psuth**2 + psvth**2 + pswth**2 )
-
-        plt.figure()
-        plt.subplot(221)
-        plt.loglog(np.sqrt( ell * psu), 'g-.', label='ulm - inv')
-        plt.loglog(np.sqrt( ell * psuth), 'g', label='ulm - actual')
-        plt.legend()
-
-        plt.subplot(222)
-        plt.loglog(np.sqrt( ell * psv), 'r-.', label='vlm - inv')
-        plt.loglog(np.sqrt( ell * psvth), 'r', label='vlm - actual')
-        plt.legend()
-        
-        plt.subplot(223)
-        plt.loglog(np.sqrt( ell * psw), 'b-.', label='wlm - inv')
-        plt.loglog(np.sqrt( ell * pswth), 'b', label='wlm - actual')
-        plt.legend()
-        
-        plt.subplot(224)
-        plt.loglog(np.sqrt( ell * pstot), color='black',
-                   linestyle='-.', label='full - inv')
-        plt.loglog(np.sqrt( ell * pstotth), 'black', label='full - actual')
-        plt.legend()
-        plt.show()
-        """
-        phSize = 2*thSize
-        urA, utA, upA = vel_from_spectra_allt(ulmA, vlmA, wlmA, 
-                                        thSize, phSize, lmaxCalc)
-        urAth, utAth, upAth = vel_from_spectra_allt(ulmAth, vlmAth, 
-                                        wlmAth, thSize, phSize, lmaxCalc)
-
-        lr = np.cos(theta).reshape(thSize, 1)
-        lt = -np.sin(theta).reshape(thSize, 1)
-        losVelA = urA * lr + utA * lt
-        losVelAth = urAth * lr + utAth * lt
-
-        np.savetxt("psu.txt", psu)
-        np.savetxt("psv.txt", psv)
-        np.savetxt("psw.txt", psw)
-        np.savetxt("psuth.txt", psuth)
-        np.savetxt("psvth.txt", psvth)
-        np.savetxt("pswth.txt", pswth)
-
-        np.savez("urtpA.npz", ur=urA, ut=utA, up=upA)
-        np.savez("urtpAth.npz", ur=urAth, ut=utAth, up=upAth)
-
-        _max1 = max( abs(urA.real).max(), abs(urA.real).min(), \
-            abs(urAth.real).max(), abs(urAth.real).min())
-        _max2 = max( abs(utA.real).max(), abs(utA.real).min(), \
-            abs(utAth.real).max(), abs(utAth.real).min())
-        print(f"x = {x.shape}, y = {y.shape}, ur = {urA.shape}")
-        Ncont = 15
-        plt.figure()
-        plt.subplot(321)
-    #    im = plt.imshow(urA.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max1, vmin=-_max1)
-        im = plt.contour(x, y, urA.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title('$u_r$- inv')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.subplot(322)
-        #im = plt.imshow(urAth.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max1, vmin=-_max1)
-        im = plt.contour(x, y, urAth.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title('$u_r$- actual')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.subplot(323)
-        #im = plt.imshow(utA.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max2, vmin=-_max2)
-        im = plt.contour(x, y, utA.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title(r'$u_\theta$- inv')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.subplot(324)
-        #im = plt.imshow(utAth.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max2, vmin=-_max2)
-        im = plt.contour(x, y, utAth.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title(r'$u_\theta$- actual')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.subplot(325)
-        #im = plt.imshow(upA.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max2, vmin=-_max2)
-        im = plt.contour(x, y, upA.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title('$u_\phi$ - inv')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.subplot(326)
-        #im = plt.imshow(upAth.real, cmap='seismic', extent=[0,2*np.pi,pi/2,0])#, vmax=_max2, vmin=-_max2)
-        im = plt.contour(x, y, upAth.real, Ncont, cmap='seismic', linewidth=0.4)#, vmax=_max1, vmin=-_max1)
-        plt.colorbar(im)
-        plt.title('$u_\phi$ - actual')
-        plt.axis('equal')
-        #plt.ylabel(r'$\theta$')
-        #plt.xlabel('$\phi$')
-        plt.tight_layout()
-        plt.show()
-
-
-        plt.figure()
-
-        plt.subplot(231)
-        im = plt.contour(x, y, losVelA.real, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(real) - inverted')
-        
-        plt.subplot(232)
-        im = plt.contour(x, y, losVelAth.real, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(real) - actual')
-
-        plt.subplot(233)
-        im = plt.contour(x, y, losVelA.real + losVelAth.real, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(real) - diff')
-
-        plt.subplot(234)
-        im = plt.contour(x, y, losVelA.imag, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(imag) - inverted')
-        
-        plt.subplot(235)
-        im = plt.contour(x, y, losVelAth.imag, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(imag) - actual')
-
-        plt.subplot(236)
-        im = plt.contour(x, y, losVelA.imag + losVelAth.imag, Ncont, cmap='seismic')
-        plt.colorbar(im)
-        plt.axis('equal')
-        plt.title('los(imag) - diff')
-
-        plt.tight_layout()
-        plt.show()
-        """
