@@ -348,14 +348,20 @@ if __name__=="__main__":
     # 1 - used for coordinates where pole is at solar north pole
     # 2 - used for coordinates where pole is at disk center
     use_fits = False
+    use_pkl = False
     days = args.gnup if args.gnup else 0
     if use_fits:
         data = fits.open("residual.fits", memmemmap=False)[0].data.flatten()
         phi2 = fits.open("phiRot.fits", memmemmap=False)[0].data.flatten()
         theta2 = fits.open("thetaRot.fits", memmap=False)[0].data.flatten()
     else:
-        data = pkl.load(open(working_dir + "residual" + str(days).zfill(3)\
-                             + ".pkl", "rb")).flatten() 
+        if use_pkl:
+            data = pkl.load(open(working_dir + "residual" \
+                                 + str(days).zfill(3) \
+                                 + ".pkl", "rb")).flatten()
+        else:
+            data = np.load(working_dir + "residual" + str(days).zfill(3)\
+                             + ".pkl.npy").flatten() 
         phi2 = pkl.load(open(working_dir + "phiRot" + str(days).zfill(3)\
                              + ".pkl", "rb")).flatten()
         theta2 = pkl.load(open(working_dir + "thetaRot" + str(days).zfill(3)\

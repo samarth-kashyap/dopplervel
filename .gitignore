@@ -2,6 +2,8 @@
 *.fits
 *.txt
 *.npz
+*.npy
+*.png
 *.pkl
 *~
 *.log
@@ -9,3 +11,6 @@
 *#
 *.temp
 *.first
+*.out
+*.err
+nodefile
