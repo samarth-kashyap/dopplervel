@@ -1,14 +1,13 @@
 from scipy.spatial.transform import Rotation as R
 from astropy.io import fits
-from math import sqrt, pi
+from math import sqrt
 import pickle as pkl
 import healpy as hp
 import numpy as np
 import argparse
 import pickle
-import time
 
-import sys; sys.path.append("/home/g.samarth/")
+
 NSIDE = 1024
 
 parser = argparse.ArgumentParser()
@@ -32,12 +31,10 @@ else:
     home_dir = "/home/samarthgk/hpchome/"
     scratch_dir = "/home/samarthgk/hpcscratch/"
 
-import sys; sys.path.append(home_dir)
-from heliosPy import iofuncs as cio
 
 def make_map(theta, phi, data, NSIDE):
     """Makes healpy map given HMI image and coordinate data
-    
+
     Parameters:
     -----------
     theta - np.ndarray(ndim=1, dtype=np.float)
@@ -56,7 +53,7 @@ def make_map(theta, phi, data, NSIDE):
     counts = np.ones(num_pix, dtype=np.int)
     theta_new = np.zeros(num_pix)
     phi_new = np.zeros(num_pix)
-    
+
     for i, k in enumerate(data):
         index = hp.ang2pix(NSIDE, theta[i], phi[i])
         theta_new[index], phi_new[index] = hp.pix2ang(NSIDE, index)
@@ -68,21 +65,33 @@ def make_map(theta, phi, data, NSIDE):
         counts[index] += 1
     return e1map/counts, existance, theta_new, phi_new
 
+
 def rotate_map_spin_eul(hmap, eulAngle):
-    """Take hmap (a healpix map array) and return another healpix map array 
-    which is ordered such that it has been rotated in (theta, phi) by the 
+    """Take hmap (a healpix map array) and return another healpix map array
+    which is ordered such that it has been rotated in (theta, phi) by the
     amounts given.
+
+    Parameters:
+    -----------
+    hmap - healpy map
+        healpy map object
+
+    eulAngle - euler angle
+
+    Returns:
+    --------
+    rot_map0, rot_map1
     """
     npix = len(hmap[0])
     nside = hp.npix2nside(npix)
 
     # Get theta, phi for non-rotated map
-    theta, phi = hp.pix2ang(nside, np.arange(npix)) 
+    theta, phi = hp.pix2ang(nside, np.arange(npix))
     costh, cosph = np.cos(theta), np.cos(phi)
     sinth, sinph = np.sin(theta), np.sin(phi)
     vth = np.array([costh*cosph, costh*sinph, -sinth])
     vph = np.array([-sinph, cosph, 0.0*cosph])
-    
+
     r = hp.rotator.Rotator(eulAngle, deg=False, eulertype='zxz')
 
     # Get theta, phi under rotated co-ordinates
@@ -101,27 +110,28 @@ def rotate_map_spin_eul(hmap, eulAngle):
     rot_map1temp = hp.get_interp_val(hmap[1], theta_rot, phi_rot)
 
     # Obtaining the rotated maps
-    rot_map0 = (vth*vph_rot).sum(axis=0) * rot_map0temp \
-             + (vph*vph_rot).sum(axis=0) * rot_map1temp
+    rot_map0 = (vth*vph_rot).sum(axis=0) * rot_map0temp +\
+        (vph*vph_rot).sum(axis=0) * rot_map1temp
 
-    rot_map1 = (vth*vth_rot).sum(axis=0) * rot_map0temp \
-             + (vph*vth_rot).sum(axis=0) * rot_map1temp
+    rot_map1 = (vth*vth_rot).sum(axis=0) * rot_map0temp +\
+        (vph*vth_rot).sum(axis=0) * rot_map1temp
 
     return rot_map0, rot_map1
 
+
 def get_alm_ps(mapp):
     """Get alms and the power spectrum
-    
+
     Parameters:
     -----------
-    mapp - healPy map 
+    mapp - healPy map
 
     Returns:
     --------
     alm - np.ndarray(ndim=1, dtype=complex)
         The spherical harmonic coefficients
     powerSpec - np.ndarray(ndim=1, dtype=float)
-        Power spectrum ( \sum_{m} |alm|^2 )
+        Power spectrum ( sum_{m} |alm|^2 )
     ellArr - np.ndarray(ndim=1, dtype=int)
         array containing the ell values
     """
@@ -130,10 +140,11 @@ def get_alm_ps(mapp):
     ellArr = np.arange(len(powerSpec))
     return alm, powerSpec, ellArr
 
+
 def restructure(ellArr, emmArr, lmax, coefs):
     """Resturcture the alms in the convention followed by pyshtools
     ---------------------------------------------------------------
-    
+
     Parameters:
     -----------
     ellArr - np.ndarray(ndim=1, dtype=int)
@@ -144,12 +155,12 @@ def restructure(ellArr, emmArr, lmax, coefs):
         maximum value of ell
     coefs - np.ndarray(ndim=1, dtype=complex)
         the alm coefficients
-    
+
     Returns:
     --------
     new_coefs - np.ndarray(ndim=1, dtype=complex)
         The alm array in the new format
-    
+
     Notes:
     ------
     The convention followed by pyshtools:
@@ -161,15 +172,16 @@ def restructure(ellArr, emmArr, lmax, coefs):
     count = 0
     new_coefs = np.zeros(coefs.shape[0], dtype=complex)
     for ell in range(lmax):
-        for emm in range(ell+1): 
-            index = np.where( (ellArr==ell) * (emmArr==emm) )[0][0]
+        for emm in range(ell+1):
+            index = np.where((ellArr == ell) * (emmArr == emm))[0][0]
             new_coefs[count] = coefs[index]
             count += 1
     return new_coefs
 
+
 def get_only_t(ellArr, emmArr, alm, lmax, t):
-    """Filter out the values of alm for a given value of emm 
-    
+    """Filter out the values of alm for a given value of emm
+
     Parameters:
     -----------
     ellArr - np.ndarray(ndim=1, dtype=int)
@@ -186,19 +198,20 @@ def get_only_t(ellArr, emmArr, alm, lmax, t):
     Returns:
     --------
     alm_new - np.ndarray(ndim=1, dtype=complex)
-    
+
     """
     count = 0
     alm_new = np.zeros(int(lmax - t + 1), dtype=complex)
     for ell in range(t, lmax+1):
-        index = np.where( (ellArr==ell) * (emmArr==t) )[0][0]
+        index = np.where((ellArr == ell) * (emmArr == t))[0][0]
         alm_new[count] = alm[index]
         count += 1
     return alm_new
 
+
 def computePS(ellArr, emmArr, lmax, coefs):
     """Computes the power spectrum
-    
+
     Parameters:
     -----------
     ellArr - np.ndarray(ndim=1, dtype=int)
@@ -217,18 +230,19 @@ def computePS(ellArr, emmArr, lmax, coefs):
 
     Notes:
     ------
-    Power spectrum = \sum_{m} | alm |^2 
+    Power spectrum = sum_{m} | alm |^2
 
     """
     ps = np.zeros(lmax+1)
     for ell in range(lmax+1):
-        index = np.where( (ellArr==ell) )[0]
-        ps[ell] = (abs(coefs[index])**2).sum()*2# / (2*ell+1)
+        index = np.where((ellArr == ell))[0]
+        ps[ell] = (abs(coefs[index])**2).sum()*2  # / (2*ell+1)
     return ps
-        
+
+
 def tracking(alm, emmArr, ellArr, lmax, trate, time):
     """Tracks the data with a given tracking rate.
-    
+
     Parameters:
     -----------
     alm - np.ndarray(ndim=1, dtype=complex)
@@ -239,7 +253,7 @@ def tracking(alm, emmArr, ellArr, lmax, trate, time):
         array containing the ell values
     lmax - int
         maximum value of ell
-    trate - float 
+    trate - float
         tracking rate in Hz
     time - float
         time in seconds
@@ -251,17 +265,18 @@ def tracking(alm, emmArr, ellArr, lmax, trate, time):
 
     Notes:
     ------
-    By tracking spherical harmonic coefficients, we effectively introduce 
-    an additional phase of e^{i t T} where T is the tracking rate and t is 
+    By tracking spherical harmonic coefficients, we effectively introduce
+    an additional phase of e^{i t T} where T is the tracking rate and t is
     the total time.
 
     """
     alm2 = alm.copy()
     for emm in range(lmax+1):
-        index = np.where( (emmArr==emm) )[0]
+        index = np.where((emmArr == emm))[0]
         tomega = 1j * emm * trate
         alm2[index] *= np.exp(tomega)
     return alm2
+
 
 def get_spin1_alms(map_r, map_trans):
     """Get the vector spherical harmonic coefficients for spin1 harmonics.
@@ -274,7 +289,7 @@ def get_spin1_alms(map_r, map_trans):
         len(map_trans) = 2
         map_trans[0] - map of vector field corresponding to +1 component
         map_trans[1] - map of vector field corresponding to -1 component
-    
+
     Returns:
     --------
     alm2r - spin0 spherical harmonic coefficients
@@ -289,6 +304,7 @@ def get_spin1_alms(map_r, map_trans):
     alm_w = -1j*alm_pm[1]
     return alm_r, alm_v, alm_w
 
+
 def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
     """Generates the spin0 and spin1 maps for a given image and coordinates.
 
@@ -297,7 +313,7 @@ def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
     data_map - np.ndarray(ndim=1, dtype=float)
         healPy map of the observed data
     mask_map - np.ndarray(ndim=1, dtype=bool)
-        healPy map of the mask 
+        healPy map of the mask
     theta_map - np.ndarray(ndim=1, dtype=float)
         healPy map of the latitudes
     phi_map - np.ndarray(ndim=1, dtype=float)
@@ -316,11 +332,11 @@ def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
         map_trans[1] - spin1 map corresponding to spin=-1
 
     """
-    if pole=="diskCenter":
+    if pole == "diskCenter":
         losr = np.cos(theta_map)
         lost = -np.sin(theta_map)
         losp = 0 * lost
-    elif pole=="solarNorth":
+    elif pole == "solarNorth":
         losr = np.sin(theta_map) * np.cos(phi_map)
         lost = - np.cos(theta_map) * np.cos(phi_map)
         losp = np.sin(phi_map)
@@ -341,7 +357,7 @@ def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
     return map_r, map_trans
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     data_dir = scratch_dir + "HMIDATA/data_analysis/"
     working_dir = scratch_dir + "HMIDATA/v720s_dConS/2018/"
     # suffix convention
@@ -356,16 +372,16 @@ if __name__=="__main__":
         theta2 = fits.open("thetaRot.fits", memmap=False)[0].data.flatten()
     else:
         if use_pkl:
-            data = pkl.load(open(working_dir + "residual" \
-                                 + str(days).zfill(3) \
+            data = pkl.load(open(working_dir + "residual"
+                                 + str(days).zfill(3)
                                  + ".pkl", "rb")).flatten()
         else:
-            data = np.load(working_dir + "residual" + str(days).zfill(3)\
-                             + ".pkl.npy").flatten() 
-        phi2 = pkl.load(open(working_dir + "phiRot" + str(days).zfill(3)\
-                             + ".pkl", "rb")).flatten()
-        theta2 = pkl.load(open(working_dir + "thetaRot" + str(days).zfill(3)\
-                             + ".pkl", "rb")).flatten()
+            data = np.load(working_dir + "residual" + str(days).zfill(3) +
+                           ".pkl.npy").flatten()
+        phi2 = pkl.load(open(working_dir + "phiRot" + str(days).zfill(3) +
+                             ".pkl", "rb")).flatten()
+        theta2 = pkl.load(open(working_dir + "thetaRot" + str(days).zfill(3) +
+                               ".pkl", "rb")).flatten()
     radial = fits.open(working_dir + "radialGrid.fits",
                        memmemmap=False)[0].data.flatten()
 #    apod = np.exp( - radial**2/2/0.5**2)
@@ -374,14 +390,14 @@ if __name__=="__main__":
     datamask = ~np.isnan(data)
 
     # masking data, theta, phi
-    phi2= phi2[datamask]
+    phi2 = phi2[datamask]
     theta2 = theta2[datamask]
     data = data[datamask]
     apodize = apodize[datamask]
 
     # creating healPy maps (including apodization)
     data2map, mask2map, theta2map, phi2map = make_map(theta2, phi2,
-                                                        data*apodize, NSIDE)
+                                                      data*apodize, NSIDE)
     # all coordinates and maps have been converted to healPy maps
     # deleting the temporary variables
     del apodize, theta2, phi2, radial, datamask
