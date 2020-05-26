@@ -1,57 +1,23 @@
-from sklearn import linear_model as sklin # for L1 regularization using LASSO
-from pyshtools import legendre as pleg    # Legendre polynomials
-from scipy.integrate import simps         # Integration - simpsons
-import matplotlib.pyplot as plt           # Plotting
-from math import sqrt, pi, e              # Math constants
-from astropy.io import fits               # FITS handling
-import astropy.units as u                 # Handling qty with units
+from sklearn import linear_model as sklin  # for L1 regularization using LASSO
+from pyshtools import legendre as pleg     # Legendre polynomials
+from scipy.integrate import simps          # Integration - simpsons
+import matplotlib.pyplot as plt            # Plotting
+from math import sqrt, pi                  # Math constants
 import numpy as np
 import argparse
 import time
-import os
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--hpc', help="Run program on daahpc",
-                    action="store_true")
-parser.add_argument('--cchpc', help="Run program on cchpc19",
-                    action="store_true")
-parser.add_argument('--gnup', help="Argument for GNU Parallel",
-                    type=int)
-parser.add_argument('--synth', help="Invert for synthetic data",
-                    action="store_true")
-parser.add_argument('--read', help="Read matrix from file (for synthetic)",
-                    action="store_true")
-parser.add_argument('--fat', help="Use fat matrix for inversion",
-                    action="store_true")
-parser.add_argument('--l1', help="L1 minimization - LASSO",
-                    action="store_true")
-args = parser.parse_args()
-
-if args.hpc:
-    home_dir = "/home/samarth/"
-    scratch_dir = "/scratch/samarth/"
-if args.cchpc:
-    home_dir = "/home/g.samarth/"
-    scratch_dir = "/scratch/g.samarth/"
-else:
-    home_dir = "/home/samarthgk/cchpchome/"
-    scratch_dir = "/home/samarthgk/cchpcscratch/"
-
-#import sys; sys.path.append(home_dir)
-#from heliosPy import datafuncs as cdata
-#from heliosPy import mathfuncs as cmath
-#from heliosPy import iofuncs as cio
 
 def get_pleg_index(l, m):
-    """Gets the index for accessing legendre polynomials 
+    """Gets the index for accessing legendre polynomials
     (generated from pyshtools.legendre)
 
-    Parameters: 
+    Parameters:
     -----------
     l - int
         spherical harmonic degree
     m - int
-        azimuthal order 
+        azimuthal order
 
     Returns:
     --------
@@ -60,6 +26,7 @@ def get_pleg_index(l, m):
 
     """
     return int(l*(l+1)/2 + m)
+
 
 def gen_leg(lmax, theta):
     """Generates legendre polynomials and derivatives normalized to 1.0
@@ -76,47 +43,48 @@ def gen_leg(lmax, theta):
     leg - np.ndarray(ndim=2, dtype=float)
         P_l(cos(theta))
     dt_leg - np.ndarray(ndim=2, dtype=float)
-        d/d(theta) P_l(cos(theta)) 
+        d/d(theta) P_l(cos(theta))
     dp_leg - np.ndarray(ndim=2, dtype=complex)
         im * P_l(cos(theta)) / sin(theta)
 
     """
     cost = np.cos(theta)
     sint = np.sin(theta)
-    maxIndex = int( (lmax+1)*(lmax+2)/2 )
-    leg = np.zeros( (maxIndex, theta.size) )
-    leg_d1 = np.zeros( (maxIndex, theta.size) )
-    dp_leg = np.zeros( (maxIndex, theta.size), dtype=complex)
+    maxIndex = int((lmax+1)*(lmax+2)/2)
+    leg = np.zeros((maxIndex, theta.size))
+    leg_d1 = np.zeros((maxIndex, theta.size))
+    dp_leg = np.zeros((maxIndex, theta.size), dtype=complex)
 
     count = 0
     for z in cost:
         leg[:, count], leg_d1[:, count] = pleg.PlmBar_d1(lmax, z, 1, 1)
         count += 1
     dt_leg = leg_d1 * (-sint).reshape(1, sint.shape[0])
-    
+
     ellArr = np.zeros(maxIndex)
     emmArr = np.zeros(maxIndex)
     countm, countl = 0, 0
     for i in range(maxIndex):
         ellArr[i] = countl
         emmArr[i] = countm
-        if countm==countl:
+        if countm == countl:
             countl += 1
             countm = 0
         else:
             countm += 1
-    norm = np.sqrt( ellArr * (ellArr + 1) )
-    norm[norm<1] = 1.0
-    
+    norm = np.sqrt(ellArr * (ellArr + 1))
+    norm[norm < 1] = 1.0
+
     legtemp = leg.copy()
-    dp_leg = 1j * emmArr.reshape(maxIndex, 1) \
-            * legtemp / sint.reshape(1, sint.shape[0])
+    dp_leg = 1j * emmArr.reshape(maxIndex, 1) *\
+        legtemp / sint.reshape(1, sint.shape[0])
     dt_leg /= norm.reshape(maxIndex, 1)
     dp_leg /= norm.reshape(maxIndex, 1)
 
     return leg/sqrt(2)/sqrt(2*pi), \
-            dt_leg/sqrt(2)/sqrt(2*pi), \
-            dp_leg/sqrt(2)/sqrt(2*pi)
+        dt_leg/sqrt(2)/sqrt(2*pi), \
+        dp_leg/sqrt(2)/sqrt(2*pi)
+
 
 def gen_leg_real(lmax, theta):
     """Generates legendre polynomials and derivatives normalized to 1.0
@@ -133,47 +101,48 @@ def gen_leg_real(lmax, theta):
     leg - np.ndarray(ndim=2, dtype=float)
         P_l(cos(theta))
     dt_leg - np.ndarray(ndim=2, dtype=float)
-        d/d(theta) P_l(cos(theta)) 
+        d/d(theta) P_l(cos(theta))
     dp_leg - np.ndarray(ndim=2, dtype=complex)
         im * P_l(cos(theta)) / sin(theta)
 
     """
     cost = np.cos(theta)
     sint = np.sin(theta)
-    maxIndex = int( (lmax+1)*(lmax+2)/2 )
-    leg = np.zeros( ( maxIndex, theta.size ) )
-    leg_d1 = np.zeros( ( maxIndex, theta.size ) )
-    dp_leg = np.zeros( (maxIndex, theta.size) )
+    maxIndex = int((lmax+1)*(lmax+2)/2)
+    leg = np.zeros((maxIndex, theta.size))
+    leg_d1 = np.zeros((maxIndex, theta.size))
+    dp_leg = np.zeros((maxIndex, theta.size))
 
     count = 0
     for z in cost:
         leg[:, count], leg_d1[:, count] = pleg.PlmBar_d1(lmax, z, 1, 1)
         count += 1
     dt_leg = leg_d1 * (-sint).reshape(1, sint.shape[0])
-    
+
     ellArr = np.zeros(maxIndex)
     emmArr = np.zeros(maxIndex)
     countm, countl = 0, 0
     for i in range(maxIndex):
         ellArr[i] = countl
         emmArr[i] = countm
-        if countm==countl:
+        if countm == countl:
             countl += 1
             countm = 0
         else:
             countm += 1
-    norm = np.sqrt( ellArr * (ellArr + 1) )
-    norm[norm<1] = 1.0
-    
+    norm = np.sqrt(ellArr * (ellArr + 1))
+    norm[norm < 1] = 1.0
+
     legtemp = leg.copy()
-    dp_leg = emmArr.reshape(maxIndex, 1) \
-            * legtemp / sint.reshape(1, sint.shape[0])
+    dp_leg = emmArr.reshape(maxIndex, 1) *\
+        legtemp / sint.reshape(1, sint.shape[0])
     dt_leg /= norm.reshape(maxIndex, 1)
     dp_leg /= norm.reshape(maxIndex, 1)
 
     return leg/sqrt(2)/sqrt(2*pi), \
-            dt_leg/sqrt(2)/sqrt(2*pi), \
-            dp_leg/sqrt(2)/sqrt(2*pi)
+        dt_leg/sqrt(2)/sqrt(2*pi), \
+        dp_leg/sqrt(2)/sqrt(2*pi)
+
 
 def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
     """Velocity components in spherical coordinates from the vector spherical
@@ -493,8 +462,9 @@ def inv_SVD(A, svdlim, plotsigma=False):
     return np.dot( v.transpose().conjugate(),
                    np.dot(np.diag(sinv), u.transpose().conjugate()))
 
+
 def inv_reg1(A, regparam):
-    """Computes the regularized inverse using identity matrix as a 
+    """Computes the regularized inverse using identity matrix as a
     regularization.
 
     Parameters:
@@ -507,11 +477,13 @@ def inv_reg1(A, regparam):
     Returns:
     --------
     regularized inverse of A
-    
+
     """
     Ashape = A.shape[0]
-    return np.linalg.inv(A.transpose().conjugate().dot(A)
-        + regparam * np.identity(Ashape)).dot( A.transpose().conjugate())
+    return np.linalg.inv(A.transpose().conjugate().dot(A) +
+                         regparam * np.identity(Ashape)).dot(
+                             A.transpose().conjugate())
+
 
 def inv_reg1supp(A, regparam):
     """Computes the regularized inverse using diagonal matrix as a 
@@ -542,6 +514,7 @@ def inv_reg1supp(A, regparam):
                          + regparam * 7 * regu.transpose().dot(regu))\
                     .dot(A.transpose().conjugate())
 
+
 def inv_reg2(A, regparam):
     """Computes the regularized inverse using D2 operator as regularization.
 
@@ -555,7 +528,7 @@ def inv_reg2(A, regparam):
     Returns:
     --------
     regularized inverse of A
-    
+
     """
     reg2 = 2*np.identity(A.shape[0])
     offd2 = -1*np.identity(A.shape[0]-1)
@@ -565,6 +538,7 @@ def inv_reg2(A, regparam):
     return np.linalg.inv(A.transpose().dot(A)
                          + (regparam/16.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
+
 
 def inv_reg3(A, regparam):
     """Computes the regularized inverse using D3 operator as regularization.
@@ -578,7 +552,7 @@ def inv_reg3(A, regparam):
     Returns:
     --------
     regularized inverse of A
-    
+
     """
     reg2 = 3*np.identity(A.shape[0])
     offd2 = -1*np.identity(A.shape[0]-1)
@@ -590,10 +564,11 @@ def inv_reg3(A, regparam):
                          + (regparam/64.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
 
+
 def get_only_t(lmax, t, alm, ellArr, emmArr):
-    """Filter out the spectral coefficients corresponding to a given 
+    """Filter out the spectral coefficients corresponding to a given
     azimuthal order t.
-    
+
     Parameters:
     ----------
     lmax - int
@@ -613,15 +588,16 @@ def get_only_t(lmax, t, alm, ellArr, emmArr):
         the spectral coefficients corresponding to the given t
 
     """
-    ist = emmArr==t
-    isel = ( (ellArr>=t) * (ellArr<=lmax) )
+    ist = (emmArr == t)
+    isel = ((ellArr >= t) * (ellArr <= lmax))
     mask = ist * isel
     return alm[mask]
 
+
 def put_only_t(lmax, t, alm, almFull, ellArr, emmArr):
-    """Updates the full array of spectral coefficients with the 
+    """Updates the full array of spectral coefficients with the
     coefficients of a given t.
-    
+
     Parameters:
     ----------
     lmax - int
@@ -643,15 +619,16 @@ def put_only_t(lmax, t, alm, almFull, ellArr, emmArr):
         the full array of all spectral coefficients (upto lmax)
 
     """
-    ist = emmArr==t
-    isel = ( (ellArr>=t) * (ellArr<=lmax) )
+    ist = emmArr == t
+    isel = ((ellArr >= t) * (ellArr <= lmax))
     mask = ist * isel
     almFull[mask] = alm
     return almFull
 
+
 def deconcat(alm):
     '''Deconcatenates full array into the componets of ulm, vlm, wlm.
-    
+
     Parameters:
     -----------
     alm - np.ndarray(ndim=1, dtype=complex)
@@ -674,6 +651,58 @@ def deconcat(alm):
     alm3 = alm[2*deconsize:]
     return alm1, alm2, alm3
 
+
+def get_a_ainv(args):
+    if args.synth:
+        if args.fat:
+            if args.read:
+                A = np.load(workingDir
+                            + "fatMat"+str(t).zfill(2)+".npz")['A']
+            else:
+                A = gen_fat_mat3_real(t, lmaxCalc, theta)
+                np.savez_compressed(workingDir
+                                    + "fatMat"+str(t).zfill(2)+".npz",
+                                    A=A)
+#                Ainv = inv_SVD(A, 1e4)
+            Ainv = inv_reg1supp(A, 1e-3)
+        else:
+            if args.read:
+                A = np.load(workingDir
+                            + "fullMat"+str(t).zfill(2)+".npz")['A']
+            else:
+                A = gen_full_mat3_real(t, lmaxCalc, theta)
+                np.savez_compressed(workingDir
+                                    + "fullMat"+str(t).zfill(2)+".npz",
+                                    A=A)
+            Ainv = inv_reg1supp(A, 1e-3)
+    else:
+        """
+        if args.fat:
+            if args.read:
+                A = np.load(workingDir
+                            + "fatMat"+str(t).zfill(2)+".npz")['A']
+            else:
+                A = gen_fat_mat3_real(t, lmaxCalc, theta)
+                np.savez_compressed(workingDir
+                                    + "fatMat"+str(t).zfill(2)+".npz",
+                                    A=A)
+            Ainv = inv_SVD(A, 1e4)
+        else:
+            if args.read:
+                A = np.load(workingDir
+                            + "fullMat"+str(t).zfill(2)+".npz")['A']
+            else:
+                A = gen_full_mat3_real(t, lmaxCalc, theta)
+                np.savez_compressed(workingDir
+                                    + "fullMat"+str(t).zfill(2)+".npz",
+                                    A=A)
+            Ainv = inv_reg1supp(A, 1e-3)
+        """
+        A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
+        Ainv = inv_reg1supp(A, 1e-3)
+    return A, Ainv
+
+
 def computePS(alm, lmax, ellArr, emmArr):
     '''Computes the power spectrum given the spectral coefficients.
 
@@ -681,36 +710,105 @@ def computePS(alm, lmax, ellArr, emmArr):
     -----------
     alm - np.ndarray(ndim=1, dtype=complex)
         array of all spectral coefficients (upto lmax)
-    lmax - int 
+    lmax - int
         maximum spherical harmonic degree
     ellArr - np.ndarray(ndim=1, dtype=int)
-        array containing ell 
+        array containing ell
     emmArr - np.ndarray(ndim=1, dtype=int)
         array containing emm
-    
+
     Returns:
     --------
     ps - np.ndarray(ndim=1, dtype=float)
-        power spectrum 
-    
+        power spectrum
+
     Notes:
     ------
     The velocity power spectrum is given by ell * \sum_{m} | alm |^2
-    
+
     '''
     ps = np.zeros(lmax)
     for i in range(lmax):
-        isel = ellArr==i
-        ps[i] += (abs(alm[isel])**2).sum() * i# / (2*i + 1)
+        isel = ellArr == i
+        ps[i] += (abs(alm[isel])**2).sum() * i  # / (2*i + 1)
     return np.sqrt(ps)
 
-if __name__=="__main__":
-    print("loading files --")
-    workingDir = scratch_dir + "matrixA/lmax1535/"
-    if args.synth:
-        workingDir = scratch_dir + "matrixA/lmax1535/"
+
+def plot_inv_actual(inv, act, ell):
+    inv_total = np.sqrt(inv[0]**2 + inv[1]**2 + inv[2]**2)
+    act_total = np.sqrt(act[0]**2 + act[1]**2 + act[2]**2)
+    fig = plt.figure(figsize=(10, 10))
+    plt.rcParams.update({'font.size': 15})
+    plt.subplot(221)
+    plt.title("Radial velocity")
+    plt.loglog(np.sqrt(ell * inv[0]), 'g-.', label='$u_{lm}$ - inverted')
+    plt.loglog(np.sqrt(ell * act[0]), 'g', label='$u_{lm}$ - actual')
+    plt.xlabel("Spherical harmonic degree $l$")
+    plt.ylabel("velocity in ms$^{-1}$")
+    plt.legend()
+
+    plt.subplot(222)
+    plt.title("Poloidal velocity")
+    plt.loglog(np.sqrt(ell * inv[1]), 'r-.', label='$v_{lm}$ - inverted')
+    plt.loglog(np.sqrt(ell * act[1]), 'r', label='$v_{lm}$ - actual')
+    plt.xlabel("Spherical harmonic degree $l$")
+    plt.ylabel("velocity in ms$^{-1}$")
+    plt.legend()
+
+    plt.subplot(223)
+    plt.title("Toroidal velocity")
+    plt.loglog(np.sqrt(ell * inv[2]), 'b-.', label='$w_{lm}$ - inverted')
+    plt.loglog(np.sqrt(ell * act[2]), 'b', label='$w_{lm}$ - actual')
+    plt.xlabel("Spherical harmonic degree $l$")
+    plt.ylabel("velocity in ms$^{-1}$")
+    plt.legend()
+
+    plt.subplot(224)
+    plt.title("Total velocity")
+    plt.loglog(np.sqrt(ell * inv_total), color='black',
+               linestyle='-.', label='inverted')
+    plt.loglog(np.sqrt(ell * act_total), 'black', label='actual')
+    plt.xlabel("Spherical harmonic degree $l$")
+    plt.ylabel("velocity in ms$^{-1}$")
+    plt.legend()
+    plt.tight_layout()
+    return fig
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hpc', help="Run program on daahpc",
+                        action="store_true")
+    parser.add_argument('--cchpc', help="Run program on cchpc19",
+                        action="store_true")
+    parser.add_argument('--gnup', help="Argument for GNU Parallel",
+                        type=int)
+    parser.add_argument('--synth', help="Invert for synthetic data",
+                        action="store_true")
+    parser.add_argument('--read', help="Read matrix from file (for synthetic)",
+                        action="store_true")
+    parser.add_argument('--fat', help="Use fat matrix for inversion",
+                        action="store_true")
+    parser.add_argument('--l1', help="L1 minimization - LASSO",
+                        action="store_true")
+    args = parser.parse_args()
+
+    if args.hpc:
+        home_dir = "/home/samarth/"
+        scratch_dir = "/scratch/samarth/"
+    if args.cchpc:
+        home_dir = "/home/g.samarth/"
+        scratch_dir = "/scratch/g.samarth/"
     else:
+        home_dir = "/home/samarthgk/cchpchome/"
+        scratch_dir = "/home/samarthgk/cchpcscratch/"
+
+    print("loading files --")
+    if args.synth:
         workingDir = scratch_dir + "matrixA/synth/"
+    else:
+        workingDir = scratch_dir + "matrixA/lmax1535/"
     data_dir = scratch_dir + "HMIDATA/data_analysis/"
     data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
 
@@ -752,8 +850,8 @@ if __name__=="__main__":
     lmaxData = int(ellArr.max())
 
     if args.synth:
-        lmaxCalc = 75
-        thSize = 150
+        lmaxCalc = 150  # 75
+        thSize = 200    # 150
     else:
         lmaxCalc = 1535
         thSize = int(lmaxCalc * 1.2)
@@ -773,54 +871,8 @@ if __name__=="__main__":
 
     for t in range(lmaxCalc):
         t1 = time.time()
-        if args.synth:
-            if args.fat:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fatMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_fat_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fatMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_SVD(A, 1e4)
-            else:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fullMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_full_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fullMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_reg1supp(A, 1e-3)
-        else:
-            """
-            if args.fat:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fatMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_fat_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fatMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_SVD(A, 1e4)
-            else:
-                if args.read:
-                    A = np.load(workingDir
-                                + "fullMat"+str(t).zfill(2)+".npz")['A']
-                else:
-                    A = gen_full_mat3_real(t, lmaxCalc, theta)
-                    np.savez_compressed(workingDir
-                                        + "fullMat"+str(t).zfill(2)+".npz",
-                                        A=A)
-                Ainv = inv_reg1supp(A, 1e-3)
-            """
-            A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
-            Ainv = inv_reg1supp(A, 1e-3)
-#            Ainv = np.load(workingDir + "Ainv"+str(t).zfill(4)+".npz")['A']
-#        Ainv = inv_SVD(A, 1e4)
+        A, Ainv = get_a_ainv(args)
+        Ainv = inv_SVD(A, 1e4)
 
         ulmt = get_only_t(lmaxCalc, t, ulmo, ellArr, emmArr)
         vlmt = get_only_t(lmaxCalc, t, vlmo, ellArr, emmArr)
@@ -859,7 +911,7 @@ if __name__=="__main__":
         wlmA = put_only_t(lmaxCalc, t, uA[2], 1j*wlmA, ellArr, emmArr)
         
         t2 = time.time()
-        if t%20==0:
+        if t%20 == 0:
             print(f"Time taken for t = {t}: {(t2-t1)/60:.3f} min,"\
                   + f"({(t2-t0)/60:.3f} min)")
     tn = time.time()
@@ -867,6 +919,7 @@ if __name__=="__main__":
 
     if args.synth:
         np.savez("almInv.npz", ulm=ulmA, vlm=vlmA, wlm=wlmA)
+        suffix = ".npz"
     else:
         if args.gnup:
             suffix = str(args.gnup).zfill(3) + ".npz"
@@ -880,7 +933,7 @@ if __name__=="__main__":
     psw = computePS(wlmA, lmaxCalc, ellArr, emmArr)
     np.savez_compressed(data_dir + "power.rot" + suffix,
                         upow=psu, vpow=psv, wpow=psw)
-    pstot = np.sqrt( psu**2 + psv**2 + psw**2 )
+    pstot = np.sqrt(psu**2 + psv**2 + psw**2)
 
 #    urA, utA, upA = vel_from_spectra_allt(ulmA, vlmA, wlmA,
 #                                    thSize, phSize, lmaxCalc)
@@ -894,34 +947,14 @@ if __name__=="__main__":
         plt.ylabel('velocity $ms^{-1}$')
         plt.legend()
         plt.show()
-    
+
     if args.synth:
         psuth = computePS(ulmAth, lmaxCalc, ellArr, emmArr)
         psvth = computePS(vlmAth, lmaxCalc, ellArr, emmArr)
         pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
-        pstotth = np.sqrt( psuth**2 + psvth**2 + pswth**2 )
+        pstotth = np.sqrt(psuth**2 + psvth**2 + pswth**2)
 
-        plt.figure()
-        plt.subplot(221)
-        plt.loglog(np.sqrt( ell * psu), 'g-.', label='ulm - inv')
-        plt.loglog(np.sqrt( ell * psuth), 'g', label='ulm - actual')
-        plt.legend()
-
-        plt.subplot(222)
-        plt.loglog(np.sqrt( ell * psv), 'r-.', label='vlm - inv')
-        plt.loglog(np.sqrt( ell * psvth), 'r', label='vlm - actual')
-        plt.legend()
-        
-        plt.subplot(223)
-        plt.loglog(np.sqrt( ell * psw), 'b-.', label='wlm - inv')
-        plt.loglog(np.sqrt( ell * pswth), 'b', label='wlm - actual')
-        plt.legend()
-        
-        plt.subplot(224)
-        plt.loglog(np.sqrt( ell * pstot), color='black',
-                   linestyle='-.', label='full - inv')
-        plt.loglog(np.sqrt( ell * pstotth), 'black', label='full - actual')
-        plt.legend()
+        fig = plot_inv_actual((psu, psv, psw), (psuth, psvth, pswth), ell)
         plt.show()
         """
         phSize = 2*thSize
