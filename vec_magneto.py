@@ -514,6 +514,7 @@ def get_spin1_alms(map_r, map_trans):
 if __name__ == "__main__":
     # {{{ loading files
     data_dir = "/scratch/seismogroup/data/HMI/"
+    write_dir = "/scratch/g.samarth/HMIDATA/magnetogram/"
     vec_prefix = "ME_720s_fd10/hmi.ME_720s_fd10.20200501_000000_TAI."
     los_prefix = "M_720s/hmi.M_720s.20200501_000000_TAI.3."
     # b_los = loadfits_compressed(data_dir + los_prefix + "magnetogram.fits")
@@ -552,4 +553,10 @@ if __name__ == "__main__":
     ellmax = hp.sphtfunc.Alm.getlmax(len(alm2r))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
     t2 = time.time()
+    np.savez_compressed(write_dir + "ulmA.magnetogram.npz", ulm=alm2r)
+    np.savez_compressed(write_dir + "ulmo.magnetogram.npz", ulm=alm1r)
+    np.savez_compressed(write_dir + "vlmA.magnetogram.npz", vlm=alm2v)
+    np.savez_compressed(write_dir + "vlmo.magnetogram.npz", vlm=alm1v)
+    np.savez_compressed(write_dir + "wlmA.magnetogram.npz", wlm=alm2w)
+    np.savez_compressed(write_dir + "wlmo.magnetogram.npz", wlm=alm1w)
     print(f"Time taken to make vector maps = {(t2-t1)/60:.2f} minutes")
