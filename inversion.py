@@ -654,29 +654,33 @@ def deconcat(alm):
     return alm1, alm2, alm3
 
 
-def get_a_ainv(args):
+def get_a_ainv(t, args):
     if args.synth:
-        if args.fat:
-            if args.read:
-                A = np.load(workingDir
-                            + "fatMat"+str(t).zfill(2)+".npz")['A']
-            else:
-                A = gen_fat_mat3_real(t, lmaxCalc, theta)
-                np.savez_compressed(workingDir
-                                    + "fatMat"+str(t).zfill(2)+".npz",
-                                    A=A)
-#                Ainv = inv_SVD(A, 1e4)
+        if args.magneto:
+            A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
             Ainv = inv_reg1supp(A, 1e-3)
         else:
-            if args.read:
-                A = np.load(workingDir
-                            + "fullMat"+str(t).zfill(2)+".npz")['A']
+            if args.fat:
+                if args.read:
+                    A = np.load(workingDir
+                                + "fatMat"+str(t).zfill(2)+".npz")['A']
+                else:
+                    A = gen_fat_mat3_real(t, lmaxCalc, theta)
+                    np.savez_compressed(workingDir
+                                        + "fatMat"+str(t).zfill(2)+".npz",
+                                        A=A)
+    #                Ainv = inv_SVD(A, 1e4)
+                Ainv = inv_reg1supp(A, 1e-3)
             else:
-                A = gen_full_mat3_real(t, lmaxCalc, theta)
-                np.savez_compressed(workingDir
-                                    + "fullMat"+str(t).zfill(2)+".npz",
-                                    A=A)
-            Ainv = inv_reg1supp(A, 1e-3)
+                if args.read:
+                    A = np.load(workingDir
+                                + "fullMat"+str(t).zfill(2)+".npz")['A']
+                else:
+                    A = gen_full_mat3_real(t, lmaxCalc, theta)
+                    np.savez_compressed(workingDir
+                                        + "fullMat"+str(t).zfill(2)+".npz",
+                                        A=A)
+                Ainv = inv_reg1supp(A, 1e-3)
     else:
         """
         if args.fat:
@@ -777,7 +781,6 @@ def plot_inv_actual(inv, act, ell):
     return fig
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--hpc', help="Run program on daahpc",
@@ -787,6 +790,8 @@ if __name__ == "__main__":
     parser.add_argument('--gnup', help="Argument for GNU Parallel",
                         type=int)
     parser.add_argument('--synth', help="Invert for synthetic data",
+                        action="store_true")
+    parser.add_argument('--magneto', help="Invert for magnetic field data",
                         action="store_true")
     parser.add_argument('--read', help="Read matrix from file (for synthetic)",
                         action="store_true")
@@ -809,27 +814,42 @@ if __name__ == "__main__":
     print("loading files --")
     if args.synth:
         workingDir = scratch_dir + "matrixA/synth/"
+        if args.magneto:
+            workingDir = scratch_dir + "matrixA/lmax1535/"
     else:
         workingDir = scratch_dir + "matrixA/lmax1535/"
     data_dir = scratch_dir + "HMIDATA/data_analysis/"
     data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
 
     if args.synth:
-        # synthetic data has both true and observed alms
-        arrFile = np.load("arrlm.npz")# contains arrays of ell and emm
-        almFile = np.load("alm.npz")  # contains arrays of alms - observed
-        almAFile = np.load("almA.npz")# contains arrays of alms - theoretical
-        # loading ell and emm arrays
-        ellArr = arrFile['ellArr']
-        emmArr = arrFile['emmArr']
-        # loading alms - observed
-        ulmo = almFile['ulm']
-        vlmo = almFile['vlm']
-        wlmo = almFile['wlm']
-        # loading alms - theoretical
-        ulmAth = almAFile['ulm']
-        vlmAth = almAFile['vlm']
-        wlmAth = almAFile['wlm']
+        if args.magneto:
+            magneto_dir = "/scratch/g.samarth/HMIDATA/magnetogram/"
+            arrFile = np.load("datafiles/arrlm.npz")
+            # contains arrays of ell and emm
+            ellArr = arrFile['ellArr']
+            emmArr = arrFile['emmArr']
+            ulmo = np.load(magneto_dir + "ulmo.magnetogram.npz")['ulm']
+            vlmo = np.load(magneto_dir + "vlmo.magnetogram.npz")['vlm']
+            wlmo = np.load(magneto_dir + "wlmo.magnetogram.npz")['wlm']
+            ulmAth = np.load(magneto_dir + "ulmA.magnetogram.npz")['ulm']
+            vlmAth = np.load(magneto_dir + "vlmA.magnetogram.npz")['vlm']
+            wlmAth = np.load(magneto_dir + "wlmA.magnetogram.npz")['wlm']
+        else:
+            # synthetic data has both true and observed alms
+            arrFile = np.load("arrlm.npz")# contains arrays of ell and emm
+            almFile = np.load("alm.npz")  # contains arrays of alms - observed
+            almAFile = np.load("almA.npz")# contains arrays of alms - theoretical
+            # loading ell and emm arrays
+            ellArr = arrFile['ellArr']
+            emmArr = arrFile['emmArr']
+            # loading alms - observed
+            ulmo = almFile['ulm']
+            vlmo = almFile['vlm']
+            wlmo = almFile['wlm']
+            # loading alms - theoretical
+            ulmAth = almAFile['ulm']
+            vlmAth = almAFile['vlm']
+            wlmAth = almAFile['wlm']
     else:
         # real data has only observed alms
         ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
@@ -854,6 +874,9 @@ if __name__ == "__main__":
     if args.synth:
         lmaxCalc = 150  # 75
         thSize = 200    # 150
+        if args.magneto:
+            lmaxCalc = 1535
+            thSize = int(lmaxCalc * 1.2)
     else:
         lmaxCalc = 1535
         thSize = int(lmaxCalc * 1.2)
@@ -873,8 +896,8 @@ if __name__ == "__main__":
 
     for t in range(lmaxCalc):
         t1 = time.time()
-        A, Ainv = get_a_ainv(args)
-        Ainv = inv_SVD(A, 1e4)
+        A, Ainv = get_a_ainv(t, args)
+#        Ainv = inv_SVD(A, 1e4)
 
         ulmt = get_only_t(lmaxCalc, t, ulmo, ellArr, emmArr)
         vlmt = get_only_t(lmaxCalc, t, vlmo, ellArr, emmArr)

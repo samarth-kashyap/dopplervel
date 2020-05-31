@@ -11,7 +11,8 @@ from sunpy.coordinates import frames
 from sunpy.net import Fido, attrs as a
 # }}} imports
 
-NSIDE = 1024
+NSIDE = 512
+
 
 # {{{ def loadfits_compressed(fname):
 def loadfits_compressed(fname):
