@@ -173,20 +173,20 @@ def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
 
     Notes:
     ------
-    The velocity profile is computed using all the spectral coefficients 
+    The velocity profile is computed using all the spectral coefficients
     upto lmax.
 
     """
     theta = np.linspace(1e-5, pi-1e-5, thSize)
     phi = np.linspace(1e-5, 2*pi - 1e-5, phSize)
-    
+
     leg, dt_leg, dp_leg = gen_leg(lmax, theta)
-    maxIndex = int( (lmax+1)*(lmax+2)/2 )
-    
-    ur = np.zeros( (thSize, phSize), dtype=complex)
-    ut = np.zeros( (thSize, phSize), dtype=complex)
-    up = np.zeros( (thSize, phSize), dtype=complex)
-    
+    maxIndex = int((lmax+1)*(lmax+2)/2)
+
+    ur = np.zeros((thSize, phSize), dtype=complex)
+    ut = np.zeros((thSize, phSize), dtype=complex)
+    up = np.zeros((thSize, phSize), dtype=complex)
+
     countm, countl = 0, 0
     for i in range(maxIndex):
         t = countm
@@ -197,12 +197,12 @@ def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
         ur += ulm[i] * leg[i, :].reshape(thSize, 1) * eitp
 
         ut += vlm[i] * dt_leg[i, :].reshape(thSize, 1) * eitp
-        ut -= wlm[i] * dp_leg[i, :].reshape(thSize, 1) * eitp 
+        ut -= wlm[i] * dp_leg[i, :].reshape(thSize, 1) * eitp
 
         up += vlm[i] * dp_leg[i, :].reshape(thSize, 1) * eitp
-        up += wlm[i] * dt_leg[i, :].reshape(thSize, 1) * eitp 
-            
-        if countm==countl:
+        up += wlm[i] * dt_leg[i, :].reshape(thSize, 1) * eitp
+
+        if countm == countl:
             countm = 0
             countl += 1
         else:
@@ -210,13 +210,14 @@ def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
 
     return ur, ut, up
 
+
 def gen_full_mat3(t, lmax, theta):
     """Generates the full leakage matrix.
-    
+
     Parameters:
     -----------
     t - int
-        azimuthal order 
+        azimuthal order
     lmax - int
         maximum spherical harmonic degree
     theta - np.ndarray(ndim=1, type=float)
@@ -230,61 +231,62 @@ def gen_full_mat3(t, lmax, theta):
     """
     sint = np.sin(theta)
     cost = np.cos(theta)
-    
-    lr = cost; lt = -sint;
+
+    lr = cost
+    lt = -sint
     leg, dt_leg, dp_leg = gen_leg(lmax, theta)
-    
+
     matsize = lmax + 1 - t
-    fullMat = np.zeros((matsize*3, matsize*3), dtype=complex);
-    
+    fullMat = np.zeros((matsize*3, matsize*3), dtype=complex)
+
     for i in range(matsize*3):
         ui, ess = divmod(i, matsize)
         ess += t
         for j in range(matsize*3):
             uj, ell = divmod(j, matsize)
             ell += t
-            normell = np.sqrt( ell * (ell + 1) ) if ell>0 else 1.0
-            if ui==0 and uj==0:
+#            normell = np.sqrt(ell * (ell + 1)) if ell > 0 else 1.0
+            if ui == 0 and uj == 0:
                 fullMat[i, j] = simps( sint * lr**2 \
                         * leg[get_pleg_index(ess, t), :] \
                         * leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta) 
-            elif ui==0 and uj==1:
+            elif ui == 0 and uj == 1:
                 fullMat[i, j] = simps( sint * lr*lt \
                         * leg[get_pleg_index(ess, t), :]\
                         * dt_leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta) 
-            elif ui==0 and uj==2:
+            elif ui == 0 and uj == 2:
                 fullMat[i, j] = simps( sint * lr*lt\
                         * leg[get_pleg_index(ess, t), :]\
                         * dp_leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta)
-            elif ui==1 and uj==0:
+            elif ui == 1 and uj == 0:
                 fullMat[i, j] = simps( sint * lr*lt\
                         * dt_leg[get_pleg_index(ess, t), :]\
                         * leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta) 
-            elif ui==1 and uj==1:
+            elif ui == 1 and uj == 1:
                 fullMat[i, j] = simps( sint * lt**2\
                         * dt_leg[get_pleg_index(ess, t), :]
                         * dt_leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta) 
-            elif ui==1 and uj==2:
+            elif ui == 1 and uj == 2:
                 fullMat[i, j] = simps( sint * lt**2\
                         * dt_leg[get_pleg_index(ess, t), :]
                         * dp_leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta)
-            elif ui==2 and uj==0:
+            elif ui == 2 and uj == 0:
                 fullMat[i, j] = simps( sint * lr*lt\
                         * dp_leg[get_pleg_index(ess, t), :]
                         * leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta)
-            elif ui==2 and uj==1:
+            elif ui == 2 and uj == 1:
                 fullMat[i, j] = simps( sint * lt**2\
                         * dp_leg[get_pleg_index(ess, t), :]
                         * dt_leg[get_pleg_index(ell, t), :].conjugate(),
                         x=theta)
-            elif ui==2 and uj==2:
+            elif ui == 2 and uj == 2:
                 fullMat[i, j] = simps( sint * lt**2\
                         * dp_leg[get_pleg_index(ess, t), :]
                         * dp_leg[get_pleg_index(ell, t), :].conjugate(),
@@ -325,47 +327,47 @@ def gen_full_mat3_real(t, lmax, theta):
         for j in range(matsize*3):
             uj, ell = divmod(j, matsize)
             ell += t
-            if ui==0 and uj==0:
+            if ui == 0 and uj == 0:
                 fullMat[i, j] = simps( sint * lr**2\
                         * leg[get_pleg_index(ess, t), :]\
                         * leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==0 and uj==1:
+            elif ui == 0 and uj == 1:
                 fullMat[i, j] = simps( sint * lr*lt\
                         * leg[get_pleg_index(ess, t), :]\
                         * dt_leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==0 and uj==2:
+            elif ui == 0 and uj == 2:
                 fullMat[i, j] = -simps( sint * lr*lt\
                         * leg[get_pleg_index(ess, t), :]\
                         * dp_leg[get_pleg_index(ell, t), :],
                         x=theta)
-            elif ui==1 and uj==0:
+            elif ui == 1 and uj == 0:
                 fullMat[i, j] = simps( sint * lr*lt \
                         * dt_leg[get_pleg_index(ess, t), :]\
                         * leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==1 and uj==1:
+            elif ui == 1 and uj == 1:
                 fullMat[i, j] = simps( sint * lt**2 \
                         * dt_leg[get_pleg_index(ess, t), :]\
                         * dt_leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==1 and uj==2:
+            elif ui == 1 and uj == 2:
                 fullMat[i, j] = -simps( sint * lt**2 \
                         * dt_leg[get_pleg_index(ess, t), :]\
                         * dp_leg[get_pleg_index(ell, t), :],
                         x=theta)
-            elif ui==2 and uj==0:
+            elif ui == 2 and uj == 0:
                 fullMat[i, j] = -simps( sint * lr*lt \
                         * dp_leg[get_pleg_index(ess, t), :]\
                         * leg[get_pleg_index(ell, t), :],
                         x=theta)
-            elif ui==2 and uj==1:
+            elif ui == 2 and uj == 1:
                 fullMat[i, j] = -simps( sint * lt**2 \
                         * dp_leg[get_pleg_index(ess, t), :]\
                         * dt_leg[get_pleg_index(ell, t), :],
                         x=theta)
-            elif ui==2 and uj==2:
+            elif ui == 2 and uj == 2:
                 fullMat[i, j] = simps( sint * lt**2 \
                         * dp_leg[get_pleg_index(ess, t), :]\
                         * dp_leg[get_pleg_index(ell, t), :],
@@ -412,17 +414,17 @@ def gen_fat_mat3_real(t, lmax, theta):
         for j in range(matsize*3):
             uj, ell = divmod(j, matsize)
             ell += t
-            if ui==0 and uj==0:
+            if ui == 0 and uj == 0:
                 fullMat[i, j] = simps( sint * lr*lr \
                         * leg[get_pleg_index(ess, t), :]\
                         * leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==0 and uj==1:
+            elif ui == 0 and uj == 1:
                 fullMat[i, j] = simps( sint * lr*lt \
                         * leg[get_pleg_index(ess, t), :]
                         * dt_leg[get_pleg_index(ell, t), :],
                         x=theta) 
-            elif ui==0 and uj==2:
+            elif ui == 0 and uj == 2:
                 fullMat[i, j] = -simps( sint * lr*lt \
                         * leg[get_pleg_index(ess, t), :]
                         * dp_leg[get_pleg_index(ell, t), :],
@@ -909,11 +911,11 @@ if __name__ == "__main__":
         ulmA = put_only_t(lmaxCalc, t, uA[0], ulmA, ellArr, emmArr)
         vlmA = put_only_t(lmaxCalc, t, uA[1], vlmA, ellArr, emmArr)
         wlmA = put_only_t(lmaxCalc, t, uA[2], 1j*wlmA, ellArr, emmArr)
-        
+
         t2 = time.time()
-        if t%20 == 0:
-            print(f"Time taken for t = {t}: {(t2-t1)/60:.3f} min,"\
-                  + f"({(t2-t0)/60:.3f} min)")
+        if t % 20 == 0:
+            print(f"Time taken for t = {t}: {(t2-t1)/60:.3f} min," +
+                  f"({(t2-t0)/60:.3f} min)")
     tn = time.time()
     print(f"Total time taken = {(tn-t0)/60:.3f} minutes")
 
