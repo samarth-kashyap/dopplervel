@@ -35,7 +35,7 @@ def get_lcurve(t, regmax, Npoints, uA):
     regparam_list = np.linspace(1e-8, regmax, Npoints)
     leastsq = np.zeros(Npoints)
     for i in range(Npoints):
-        if i%5 == 0:
+        if i % 5 == 0:
             print(f"{i} of {Npoints}")
         Ainv = reginv(A, regparam_list[i])
         uAt = Ainv.dot(uot)

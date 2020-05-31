@@ -1,20 +1,20 @@
-from scipy.interpolate import griddata as GD
-from astropy.coordinates import SkyCoord
+# {{{ Library imports
 from pyshtools import legendre as pleg
 from sunpy.coordinates import frames
+#from heliosPy import iofuncs as cio
 from sunpy.map import Map as spMap
-from scipy.integrate import simps
-from math import sqrt, pi, e
 from astropy.io import fits
-
-import matplotlib.pyplot as plt
 import astropy.units as u
 import pickle as pkl
+from math import pi
 import numpy as np
 import argparse
 import time
 import os
+# }}} imports
 
+
+# {{{ argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('--hpc', help="Run program on cluster",
                     action="store_true")
@@ -25,39 +25,38 @@ parser.add_argument('--gnup', help="Argument for gnuParallel",
 args = parser.parse_args()
 
 if args.hpc:
-    homeDir = "/home/g.samarth/"
     scratch_dir = "/scratch/g.samarth/"
 else:
-    homeDir = "/home/samarthgk/hpchome/"
     scratch_dir = "/home/samarthgk/hpcscratch/"
+# }}} argument parser
 
-import sys; sys.path.append(homeDir)
-from heliosPy import datafuncs as cdata
-from heliosPy import mathfuncs as cmath
-from heliosPy import iofuncs as cio
 
+# {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
-    """Gets the index for accessing legendre polynomials 
+    """Gets the index for accessing legendre polynomials
     (generated from pyshtools.legendre)
 
     Parameters:
     -----------
-    l : int 
+    l : int
         Spherical Harmonic degree
-    m : int 
+    m : int
         Azimuthal order
 
     Returns:
     --------
-    int 
+    int
         index for accessing legendre polynomial
     """
     return int(l*(l+1)/2 + m)
+# }}} get_pleg_index(l, m):
 
+
+# {{{ def gen_leg(lmax, theta):
 def gen_leg(lmax, theta):
     """Generates associated legendre polynomials and derivatives
-    
-    Parameters: 
+
+    Parameters:
     -----------
     lmax : int
         Maximum spherical harmonic degree
@@ -72,7 +71,7 @@ def gen_leg(lmax, theta):
     cost = np.cos(theta)
     sint = np.sin(theta)
     maxIndex = int(lmax+1)
-    ell = np.arange(lmax+1)
+#    ell = np.arange(lmax+1)
     leg = np.zeros((maxIndex, theta.size))
     leg_d1 = np.zeros((maxIndex, theta.size))
 
@@ -82,12 +81,15 @@ def gen_leg(lmax, theta):
         count += 1
     return leg/np.sqrt(2), \
         leg_d1 * (-sint).reshape(1, sint.shape[0])/np.sqrt(2)
+# }}} gen_leg(lmax, theta)
 
+
+# {{{ def gen_leg_x(lmax, x):
 def gen_leg_x(lmax, x):
     """Generates associated legendre polynomials and derivatives
     for a given x
-    
-    Parameters: 
+
+    Parameters:
     -----------
     lmax : int
         Maximum spherical harmonic degree
@@ -96,11 +98,11 @@ def gen_leg_x(lmax, x):
 
     Returns:
     --------
-    (leg, leg_d1) : list 
-        Legendre polynomial and it's derivative 
+    (leg, leg_d1) : list
+        Legendre polynomial and it's derivative
     """
     maxIndex = int(lmax+1)
-    ell = np.arange(lmax+1)
+#    ell = np.arange(lmax+1)
     leg = np.zeros((maxIndex, x.size))
     leg_d1 = np.zeros((maxIndex, x.size))
 
@@ -109,10 +111,13 @@ def gen_leg_x(lmax, x):
         leg[:, count], leg_d1[:, count] = pleg.PlBar_d1(lmax, z)
         count += 1
     return leg/np.sqrt(2), leg_d1/np.sqrt(2)
+# }}} gen_leg_x(lmax, x)
 
+
+# {{{ def smooth(img):
 def smooth(img):
     """Smoothen by averaging over neighboring pixels.
-    
+
     Parameters:
     -----------
     img : np.ndarray(ndim=2, dtype=np.float64)
@@ -123,19 +128,24 @@ def smooth(img):
     avg_img : np.ndarray(ndim=2, dtype=np.float64)
         Smoothened image
     """
-    avg_img =(    img[1:-1 ,1:-1]  # center
-                + img[ :-2 ,1:-1]  # top
-                + img[2:   ,1:-1]  # bottom
-                + img[1:-1 , :-2]  # left
-                + img[1:-1 ,2:  ]  # right
-                ) / 5.0
+    avg_img = (img[1:-1, 1:-1] +  # center
+               img[:-2, 1:-1] +   # top
+               img[2:, 1:-1] +    # bottom
+               img[1:-1, :-2] +   # left
+               img[1:-1, 2:]) / 5.0     # right
     return avg_img
+# }}} smooth(img)
 
+
+# {{{ def downsample(img, N):
 def downsample(img, N):
     for i in range(N):
         img = smooth(img)
     return img
+# }}} downsample(img, N)
 
+
+# {{{ def inv_SVD(A, svdlim):
 def inv_SVD(A, svdlim):
     u, s, v = np.linalg.svd(A, full_matrices=False)
     sinv = s**-1
@@ -146,26 +156,35 @@ def inv_SVD(A, svdlim):
     plt.title("Singular values")
     plt.show()
     '''
-    sinv[sinv/sinv[0] > svdlim] = 0.0#svdlim
-    return np.dot( v.transpose().conjugate(),
-                   np.dot(np.diag(sinv), u.transpose().conjugate()))
+    sinv[sinv/sinv[0] > svdlim] = 0.0  # svdlim
+    return np.dot(v.transpose().conjugate(),
+                  np.dot(np.diag(sinv), u.transpose().conjugate()))
+# }}} inv_SVD(A, svdlim)
 
+
+# {{{ def inv_reg1(A, regparam):
 def inv_reg1(A, regparam):
-    Ashape = A.shape[0];
-    return np.linalg.inv(A.transpose().conjugate().dot(A)
-                + regparam * np.identity(Ashape))\
-                    .dot(A.transpose().conjugate())
+    Ashape = A.shape[0]
+    return np.linalg.inv(A.transpose().conjugate().dot(A) +
+                         regparam *
+                         np.identity(Ashape)).dot(A.transpose().conjugate())
+# }}} inv_reg1(A, regparam)
 
+
+# {{{ def inv_reg2(A, regparam):
 def inv_reg2(A, regparam):
     reg2 = 2*np.identity(A.shape[0])
     offd2 = -1*np.identity(A.shape[0]-1)
     reg2[1:, :-1] += offd2
     reg2[:-1, 1:] += offd2
     reg = reg2[1:-1, :].copy()
-    return np.linalg.inv(A.transpose().dot(A) \
-                + (regparam/16.) * reg.transpose().dot(reg))\
-                    .dot(A.transpose())
+    return np.linalg.inv(A.transpose().dot(A) +
+                         (regparam/16.) *
+                         reg.transpose().dot(reg)).dot(A.transpose())
+# }}} inv_reg2(A, regparam)
 
+
+# {{{ def inv_reg3(A, regparam):
 def inv_reg3(A, regparam):
     reg2 = 3*np.identity(A.shape[0])
     offd2 = -1*np.identity(A.shape[0]-1)
@@ -176,6 +195,8 @@ def inv_reg3(A, regparam):
     return np.linalg.inv(A.transpose().dot(A) \
                 + (regparam/64.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
+# }}} inv_reg3(A, regparam)
+
 
 if __name__ == "__main__":
     hmi_data_dir = scratch_dir + "HMIDATA/v720s_dConS/2018/"
@@ -192,38 +213,39 @@ if __name__ == "__main__":
 
     if args.job:
         try:
-            procid=int(os.environ['PBS_VNODENUM'])
-        except KeyError: pass
+            procid = int(os.environ['PBS_VNODENUM'])
+        except KeyError:
+            pass
         nproc = 6
         print(f" procid = {procid}")
         daylist = np.arange(procid, total_days, nproc)
     elif args.gnup:
         daylist = np.array([args.gnup])
         if args.gnup>total_days:
-            print(f" Invalid argument for --gnup {args.gnup} . Must be "\
-                + f" less than {total_days}")
+            print(f" Invalid argument for --gnup {args.gnup} . Must be " +
+                  f" less than {total_days}")
             exit()
     else:
         daylist = np.arange(0, 2)
 
     for day in daylist:
-        ## loading HMI image as sunPy map
+        # loading HMI image as sunPy map
         hmi_map = spMap(hmi_data_dir + hmi_files[day])
 
-        ## Getting the B0 and P0 angles
+        # Getting the B0 and P0 angles
         B0 = hmi_map.observer_coordinate.lat
         P0 = hmi_map.observer_coordinate.lon
 
-        ## setting up for data cleaning
+        # setting up for data cleaning
         x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
             * u.pix
         hpc_coords = hmi_map.pixel_to_world(x, y)
         r = np.sqrt(hpc_coords.Tx ** 2 + hpc_coords.Ty ** 2)\
             / hmi_map.rsun_obs
 
-        ## removing all data beyond rcrop (heliocentric radius)
+        # removing all data beyond rcrop (heliocentric radius)
         rcrop = 0.95
-        mask_r = r>rcrop
+        mask_r = r > rcrop
 
         hmi_map.data[mask_r] = np.nan
         r[mask_r] = np.nan
@@ -261,7 +283,7 @@ if __name__ == "__main__":
         # -----------------------------------------------------------
         """
 
-        ## Removing effect of satellite velocity
+        # Removing effect of satellite velocity
         map_fits = fits.open(hmi_data_dir + hmi_files[0])
         map_fits.verify('fix')
         vx = map_fits[1].header['OBS_VR']
@@ -280,7 +302,7 @@ if __name__ == "__main__":
         sChi = np.sin(chi)
         cChi = np.cos(chi)
 
-        thetaHGC = hpc_hgf.lat.copy()# + 90*u.deg
+        thetaHGC = hpc_hgf.lat.copy()  # + 90*u.deg
         phiHGC = hpc_hgf.lon.copy()
         thHG1 = thetaHGC[mask_nan]
         phHG1 = phiHGC[mask_nan]
@@ -293,7 +315,7 @@ if __name__ == "__main__":
 
         vr1 = cp*st*vx + sp*st*vy + ct*vz
         vt1 = cp*ct*vx + sp*ct*vy - st*vz
-        vp1 = -sp*vx + cp*vy 
+        vp1 = -sp*vx + cp*vy
 
         sB0 = np.sin(B0)
         cB0 = np.cos(B0)
