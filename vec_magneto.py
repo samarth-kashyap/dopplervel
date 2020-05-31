@@ -3,12 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import sunpy.map
-from math import pi
+import healpy as hp
+import time
+from math import pi, sqrt
 import astropy.units as u
 from sunpy.coordinates import frames
 from sunpy.net import Fido, attrs as a
 # }}} imports
 
+NSIDE = 1024
 
 # {{{ def loadfits_compressed(fname):
 def loadfits_compressed(fname):
@@ -356,6 +359,158 @@ def find_avg(b):
 # }}} find_avg(b)
 
 
+# {{{ def make_vec_maps(theta, phi, br, bt, bp, NSIDE):
+def make_healpy_maps(theta, phi, br, NSIDE, losmap=True, bt=0, bp=0):
+    """Makes healpy map given HMI image and coordinate data
+
+    Parameters:
+    -----------
+    theta - np.ndarray(ndim=1, dtype=np.float)
+        latitudes of the data points
+    phi - np.ndarray(ndim=1, dtype=np.float)
+        longitudes of data points
+    br - np.ndarray(ndim=1, dtype=np.float)
+        radial component
+    bt - np.ndarray(ndim=1, dtype=np.float)
+        theta componetn
+    bp - np.ndarray(ndim=1, dtype=np.float)
+        phi component
+    NSIDE - int
+        the NSIDE parameter for healPix
+    """
+    masknan = ~np.isnan(br)
+    br = br[masknan].copy()
+    if not losmap:
+        bt = bt[masknan].copy()
+        bp = bp[masknan].copy()
+    theta = (theta[masknan].value).copy()
+    phi = (phi[masknan].value).copy()
+
+    if losmap:
+        assert len(theta) == len(phi) == len(br)
+    else:
+        assert len(theta) == len(phi) == len(br) == len(bt) == len(bp)
+
+    num_pix = hp.nside2npix(NSIDE)
+    e1map = np.full(num_pix, hp.UNSEEN, dtype=np.float)
+    if not losmap:
+        e2map = np.full(num_pix, hp.UNSEEN, dtype=np.float)
+        e3map = np.full(num_pix, hp.UNSEEN, dtype=np.float)
+    existance = np.full(num_pix, False, dtype=np.bool)
+    counts = np.ones(num_pix, dtype=np.int)
+    theta_new = np.zeros(num_pix)
+    phi_new = np.zeros(num_pix)
+
+    for i in range(len(br)):  # , k in enumerate(data):
+        index = hp.ang2pix(NSIDE, theta[i], phi[i])
+        theta_new[index], phi_new[index] = hp.pix2ang(NSIDE, index)
+        if not existance[index]:
+            e1map[index] = 0
+            if not losmap:
+                e2map[index] = 0
+                e3map[index] = 0
+            counts[index] = 0
+            existance[index] = True
+        e1map[index] += br[i]
+        if not losmap:
+            e2map[index] += bt[i]
+            e3map[index] += bp[i]
+        counts[index] += 1
+    if losmap:
+        return e1map/counts, existance, theta_new, phi_new
+    else:
+        return e1map/counts, e2map/counts, e3map/counts,\
+            existance, theta_new, phi_new
+        
+# }}} make_vec_maps(theta, phi, br, bt, bp, NSIDE)
+
+
+# {{{def get_spin1_maps(data_map, mask_map, theta_map, phi_map, ...
+def get_spin1_maps(br, mask_map, theta_map, phi_map, losmap="yes", bt=0, bp=0):
+    """Generates the spin0 and spin1 maps for a given image and coordinates.
+
+    Inputs:
+    -----------
+    br - np.ndarray(ndim=1, dtype=float)
+        healPy map of radial B if losmap="no"
+        healPy map of LOS B if losmap="yes"
+    mask_map - np.ndarray(ndim=1, dtype=bool)
+        healPy map of the mask
+    theta_map - np.ndarray(ndim=1, dtype=float)
+        healPy map of the latitudes
+    phi_map - np.ndarray(ndim=1, dtype=float)
+        healPy map of the longitudes
+    losmap - string (default = "yes")
+        determines whether vector map is used
+    bt - np.ndarray(ndim=1, dtype=float)
+        healPy map of theta component of B
+        optional parameter only when losmap="no"
+    bp - np.ndarray(ndim=1, dtype=float)
+        healPy map of radial B (or LOS field)
+        optional parameter only when losmap="no"
+
+    Returns:
+    --------
+    map_r - np.ndarray(ndim=1, dtype=float)
+        spin0 map
+    map_trans - list
+        len(map_trans) = 2
+        map_trans[0] - spin1 map corresponding to spin=+1
+        map_trans[1] - spin1 map corresponding to spin=-1
+
+    """
+    if losmap == "yes":
+        losr = np.cos(theta_map)
+        lost = -np.sin(theta_map)
+        losp = 0 * lost
+        br = br * losr
+        bt = br * lost
+        bp = br * losp
+
+    # Finding the vector spherical harmonic coefficients
+    map_r = br
+    map_p = - (bt + 1j*bp) / sqrt(2)
+    map_m = - (bt - 1j*bp) / sqrt(2)
+    map_trans = [((map_p + map_m)/2).real,
+                 (-1j*(map_p - map_m)/2).real]
+
+    map_r[~mask_map] = hp.UNSEEN
+    map_trans[0][~mask_map] = 0.0
+    map_trans[1][~mask_map] = 0.0
+
+    return map_r, map_trans
+# }}} get_spin1_maps(data_map, mask_map, theta_map, phi_map, ...
+
+
+# {{{ def get_spin1_alms(map_r, map_trans):
+def get_spin1_alms(map_r, map_trans):
+    """Get the vector spherical harmonic coefficients for spin1 harmonics.
+
+    Parameters:
+    -----------
+    map_r - np.ndarray(ndim=1, dtype=float)
+        map containing radial component of vector field
+    map_trans - list
+        len(map_trans) = 2
+        map_trans[0] - map of vector field corresponding to +1 component
+        map_trans[1] - map of vector field corresponding to -1 component
+
+    Returns:
+    --------
+    alm2r - spin0 spherical harmonic coefficients
+    alm2v - spin1 spherical harmonic coefficients for s=+1
+    alm2w - spin1 spherical harmonic coefficients for s=-1
+
+    """
+    assert len(map_r) == len(map_trans[0]) == len(map_trans[1])
+    alm_r = hp.map2alm(map_r)
+    alm_pm = hp.map2alm_spin(map_trans, 1)
+    alm_v = -alm_pm[0]
+    alm_w = -1j*alm_pm[1]
+    return alm_r, alm_v, alm_w
+# }}} get_spin1_alms(map_r, map_trans)
+
+
 if __name__ == "__main__":
     # {{{ loading files
     data_dir = "/scratch/seismogroup/data/HMI/"
@@ -370,7 +525,31 @@ if __name__ == "__main__":
                                         "inclination.fits")
     hmi_map = sunpy.map.Map(data_dir + vec_prefix + "field.fits")
 
+    blos = b_magnitude * np.cos(b_inclination)
     bx, by, bz = get_vec_cartesian(b_magnitude, b_inclination, b_azimuth)
     theta, phi = get_map_coords(hmi_map)
     rot_mat = create_rot_mat(theta, phi)
     br, bt, bp = get_sph_from_cart(bx, by, bz, rot_mat)
+
+    print("Making LOS maps healPy")
+    t1 = time.time()
+    vec_map_op = make_healpy_maps(theta, phi, br, NSIDE)
+    r_map, mask_map, theta_map, phi_map = vec_map_op
+    map1r, map1trans = get_spin1_maps(r_map, mask_map, theta_map, phi_map)
+    alm1r, alm1v, alm1w = get_spin1_alms(map1r, map1trans)
+    t2 = time.time()
+    print(f"Time taken to make LOS map = {(t2-t1)/60:.2f} minutes")
+
+    print(" ")
+    print("Making vector maps healPy")
+    t1 = time.time()
+    vec_map_op = make_healpy_maps(theta, phi, br, NSIDE,
+                                  losmap=False, bt=bt, bp=bp)
+    r_map, t_map, p_map, mask_map, theta_map, phi_map = vec_map_op
+    map2r, map2trans = get_spin1_maps(r_map, mask_map, theta_map, phi_map,
+                                      losmap="no", bt=t_map, bp=p_map)
+    alm2r, alm2v, alm2w = get_spin1_alms(map2r, map2trans)
+    ellmax = hp.sphtfunc.Alm.getlmax(len(alm2r))
+    ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
+    t2 = time.time()
+    print(f"Time taken to make vector maps = {(t2-t1)/60:.2f} minutes")
