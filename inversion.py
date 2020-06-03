@@ -1,3 +1,4 @@
+# {{{ Library imports
 from sklearn import linear_model as sklin  # for L1 regularization using LASSO
 from pyshtools import legendre as pleg     # Legendre polynomials
 from scipy.integrate import simps          # Integration - simpsons
@@ -6,8 +7,10 @@ from math import sqrt, pi                  # Math constants
 import numpy as np
 import argparse
 import time
+# }}} imports
 
 
+# {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
     """Gets the index for accessing legendre polynomials
     (generated from pyshtools.legendre)
@@ -26,8 +29,10 @@ def get_pleg_index(l, m):
 
     """
     return int(l*(l+1)/2 + m)
+# }}} get_pleg_index(l, m)
 
 
+# {{{ def gen_leg(lmax, theta)
 def gen_leg(lmax, theta):
     """Generates legendre polynomials and derivatives normalized to 1.0
 
@@ -84,8 +89,10 @@ def gen_leg(lmax, theta):
     return leg/sqrt(2)/sqrt(2*pi), \
         dt_leg/sqrt(2)/sqrt(2*pi), \
         dp_leg/sqrt(2)/sqrt(2*pi)
+# }}} gen_leg(lmax, theta)
 
 
+# {{{ def gen_leg_real(lmax, theta):
 def gen_leg_real(lmax, theta):
     """Generates legendre polynomials and derivatives normalized to 1.0
 
@@ -142,11 +149,13 @@ def gen_leg_real(lmax, theta):
     return leg/sqrt(2)/sqrt(2*pi), \
         dt_leg/sqrt(2)/sqrt(2*pi), \
         dp_leg/sqrt(2)/sqrt(2*pi)
+# }}} gen_leg_real(lmax, theta)
 
 
+# {{{ def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
 def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
-    """Velocity components in spherical coordinates from the vector spherical
-    harmonic coefficients.
+    """Velocity components in spherical coordinates
+    from the vector spherical harmonic coefficients.
 
     Parameters:
     -----------
@@ -209,8 +218,10 @@ def vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax):
             countm += 1
 
     return ur, ut, up
+# }}} vel_from_spectra_allt(ulm, vlm, wlm, thSize, phSize, lmax)
 
 
+# {{{ def gen_full_mat3(t, lmax, theta):
 def gen_full_mat3(t, lmax, theta):
     """Generates the full leakage matrix.
 
@@ -247,60 +258,62 @@ def gen_full_mat3(t, lmax, theta):
             ell += t
 #            normell = np.sqrt(ell * (ell + 1)) if ell > 0 else 1.0
             if ui == 0 and uj == 0:
-                fullMat[i, j] = simps( sint * lr**2 \
-                        * leg[get_pleg_index(ess, t), :] \
-                        * leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr**2 *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 0 and uj == 1:
-                fullMat[i, j] = simps( sint * lr*lt \
-                        * leg[get_pleg_index(ess, t), :]\
-                        * dt_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 0 and uj == 2:
-                fullMat[i, j] = simps( sint * lr*lt\
-                        * leg[get_pleg_index(ess, t), :]\
-                        * dp_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta)
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      dp_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 1 and uj == 0:
-                fullMat[i, j] = simps( sint * lr*lt\
-                        * dt_leg[get_pleg_index(ess, t), :]\
-                        * leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      dt_leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 1 and uj == 1:
-                fullMat[i, j] = simps( sint * lt**2\
-                        * dt_leg[get_pleg_index(ess, t), :]
-                        * dt_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dt_leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 1 and uj == 2:
-                fullMat[i, j] = simps( sint * lt**2\
-                        * dt_leg[get_pleg_index(ess, t), :]
-                        * dp_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta)
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dt_leg[get_pleg_index(ess, t), :] *
+                                      dp_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 2 and uj == 0:
-                fullMat[i, j] = simps( sint * lr*lt\
-                        * dp_leg[get_pleg_index(ess, t), :]
-                        * leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta)
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      dp_leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 2 and uj == 1:
-                fullMat[i, j] = simps( sint * lt**2\
-                        * dp_leg[get_pleg_index(ess, t), :]
-                        * dt_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta)
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dp_leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
             elif ui == 2 and uj == 2:
-                fullMat[i, j] = simps( sint * lt**2\
-                        * dp_leg[get_pleg_index(ess, t), :]
-                        * dp_leg[get_pleg_index(ell, t), :].conjugate(),
-                        x=theta)
-
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dp_leg[get_pleg_index(ess, t), :] *
+                                      dp_leg[get_pleg_index(ell, t), :]
+                                      .conjugate(), x=theta)
     return fullMat*2*pi
+# }}} gen_full_mat3(t, lmax, theta)
 
+
+# {{{ def gen_full_mat3_real(t, lmax, theta):
 def gen_full_mat3_real(t, lmax, theta):
     """Generates the full leakage matrix with real components.
-    
+
     Parameters:
     -----------
     t - int
-        azimuthal order 
+        azimuthal order
     lmax - int
         maximum spherical harmonic degree
     theta - np.ndarray(ndim=1, type=float)
@@ -314,13 +327,14 @@ def gen_full_mat3_real(t, lmax, theta):
     """
     sint = np.sin(theta)
     cost = np.cos(theta)
-    
-    lr = cost; lt = -sint;
+
+    lr = cost
+    lt = -sint
     leg, dt_leg, dp_leg = gen_leg_real(lmax, theta)
-    
+
     matsize = lmax + 1 - t
-    fullMat = np.zeros((matsize*3, matsize*3));
-    
+    fullMat = np.zeros((matsize*3, matsize*3))
+
     for i in range(matsize*3):
         ui, ess = divmod(i, matsize)
         ess += t
@@ -328,60 +342,62 @@ def gen_full_mat3_real(t, lmax, theta):
             uj, ell = divmod(j, matsize)
             ell += t
             if ui == 0 and uj == 0:
-                fullMat[i, j] = simps( sint * lr**2\
-                        * leg[get_pleg_index(ess, t), :]\
-                        * leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr**2 *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 0 and uj == 1:
-                fullMat[i, j] = simps( sint * lr*lt\
-                        * leg[get_pleg_index(ess, t), :]\
-                        * dt_leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 0 and uj == 2:
-                fullMat[i, j] = -simps( sint * lr*lt\
-                        * leg[get_pleg_index(ess, t), :]\
-                        * dp_leg[get_pleg_index(ell, t), :],
-                        x=theta)
+                fullMat[i, j] = -simps(sint * lr*lt *
+                                       leg[get_pleg_index(ess, t), :] *
+                                       dp_leg[get_pleg_index(ell, t), :],
+                                       x=theta)
             elif ui == 1 and uj == 0:
-                fullMat[i, j] = simps( sint * lr*lt \
-                        * dt_leg[get_pleg_index(ess, t), :]\
-                        * leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      dt_leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 1 and uj == 1:
-                fullMat[i, j] = simps( sint * lt**2 \
-                        * dt_leg[get_pleg_index(ess, t), :]\
-                        * dt_leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dt_leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 1 and uj == 2:
-                fullMat[i, j] = -simps( sint * lt**2 \
-                        * dt_leg[get_pleg_index(ess, t), :]\
-                        * dp_leg[get_pleg_index(ell, t), :],
-                        x=theta)
+                fullMat[i, j] = -simps(sint * lt**2 *
+                                       dt_leg[get_pleg_index(ess, t), :] *
+                                       dp_leg[get_pleg_index(ell, t), :],
+                                       x=theta)
             elif ui == 2 and uj == 0:
-                fullMat[i, j] = -simps( sint * lr*lt \
-                        * dp_leg[get_pleg_index(ess, t), :]\
-                        * leg[get_pleg_index(ell, t), :],
-                        x=theta)
+                fullMat[i, j] = -simps(sint * lr*lt *
+                                       dp_leg[get_pleg_index(ess, t), :] *
+                                       leg[get_pleg_index(ell, t), :],
+                                       x=theta)
             elif ui == 2 and uj == 1:
-                fullMat[i, j] = -simps( sint * lt**2 \
-                        * dp_leg[get_pleg_index(ess, t), :]\
-                        * dt_leg[get_pleg_index(ell, t), :],
-                        x=theta)
+                fullMat[i, j] = -simps(sint * lt**2 *
+                                       dp_leg[get_pleg_index(ess, t), :] *
+                                       dt_leg[get_pleg_index(ell, t), :],
+                                       x=theta)
             elif ui == 2 and uj == 2:
-                fullMat[i, j] = simps( sint * lt**2 \
-                        * dp_leg[get_pleg_index(ess, t), :]\
-                        * dp_leg[get_pleg_index(ell, t), :],
-                        x=theta)
-                
+                fullMat[i, j] = simps(sint * lt**2 *
+                                      dp_leg[get_pleg_index(ess, t), :] *
+                                      dp_leg[get_pleg_index(ell, t), :],
+                                      x=theta)
     return fullMat*2*pi
+# }}} gen_full_mat3_real(t, lmax, theta)
 
+
+# {{{ def gen_fat_mat3_real(t, lmax, theta):
 def gen_fat_mat3_real(t, lmax, theta):
     """Generates the fat leakage matrix with real components.
-    
+
     Parameters:
     -----------
     t - int
-        azimuthal order 
+        azimuthal order
     lmax - int
         maximum spherical harmonic degree
     theta - np.ndarray(ndim=1, type=float)
@@ -394,20 +410,21 @@ def gen_fat_mat3_real(t, lmax, theta):
 
     Notes:
     ------
-    The RHS has spectral coefficients corresponding to (ulm, vlm, wlm) and the
-    LHS has spectral coefficients of (ulm) only. Hence the leakage matrix 
-    is fat. 
+    The RHS has spectral coefficients corresponding to
+    (ulm, vlm, wlm) and the LHS has spectral coefficients of (ulm) only.
+    Hence the leakage matrix is fat.
 
     """
     sint = np.sin(theta)
     cost = np.cos(theta)
-    
-    lr = cost; lt = -sint
+
+    lr = cost
+    lt = -sint
     leg, dt_leg, dp_leg = gen_leg_real(lmax, theta)
-    
+
     matsize = lmax + 1 - t
     fullMat = np.zeros((matsize, matsize*3))
-    
+
     for i in range(matsize):
         ui, ess = divmod(i, matsize)
         ess += t
@@ -415,25 +432,27 @@ def gen_fat_mat3_real(t, lmax, theta):
             uj, ell = divmod(j, matsize)
             ell += t
             if ui == 0 and uj == 0:
-                fullMat[i, j] = simps( sint * lr*lr \
-                        * leg[get_pleg_index(ess, t), :]\
-                        * leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lr *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 0 and uj == 1:
-                fullMat[i, j] = simps( sint * lr*lt \
-                        * leg[get_pleg_index(ess, t), :]
-                        * dt_leg[get_pleg_index(ell, t), :],
-                        x=theta) 
+                fullMat[i, j] = simps(sint * lr*lt *
+                                      leg[get_pleg_index(ess, t), :] *
+                                      dt_leg[get_pleg_index(ell, t), :],
+                                      x=theta)
             elif ui == 0 and uj == 2:
-                fullMat[i, j] = -simps( sint * lr*lt \
-                        * leg[get_pleg_index(ess, t), :]
-                        * dp_leg[get_pleg_index(ell, t), :],
-                        x=theta)
-
+                fullMat[i, j] = -simps(sint * lr*lt *
+                                       leg[get_pleg_index(ess, t), :] *
+                                       dp_leg[get_pleg_index(ell, t), :],
+                                       x=theta)
     return fullMat*2*pi
+# }}} gen_fat_mat3_real(t, lmax, theta)
 
+
+# {{{ def inv_SVD(A, svdlim, plotsigma=False):
 def inv_SVD(A, svdlim, plotsigma=False):
-    """Computes pseudo-inverse using Singular Value Decomposition after 
+    """Computes pseudo-inverse using Singular Value Decomposition after
     ignoring singular values below given limit.
 
     Parameters:
@@ -443,7 +462,7 @@ def inv_SVD(A, svdlim, plotsigma=False):
 
     svdlim - double
         cutoff for inverse of singular values
-        e.g. cutoff = 1e4 \implies all elements of \sigma/sinv[0] > 1e4 
+        e.g. cutoff = 1e4 implies all elements of sigma/sinv[0] > 1e4
         is set to 0
 
     Returns:
@@ -451,20 +470,22 @@ def inv_SVD(A, svdlim, plotsigma=False):
     Ainv - np.ndarray(ndim=2, dtype=complex)
         pseudo inverse of the matrix A
 
-    
     """
     u, s, v = np.linalg.svd(A, full_matrices=False)
     sinv = s**-1
     if plotsigma:
-        plt.figure(); plt.semilogy(sinv, '.')
+        plt.figure()
+        plt.semilogy(sinv, '.')
         plt.axhline(y=svdlim)
         plt.title("Singular values")
         plt.show()
-    sinv[sinv/sinv[0] > svdlim] = 0.0#svdlim
-    return np.dot( v.transpose().conjugate(),
-                   np.dot(np.diag(sinv), u.transpose().conjugate()))
+    sinv[sinv/sinv[0] > svdlim] = 0.0  # svdlim
+    return np.dot(v.transpose().conjugate(),
+                  np.dot(np.diag(sinv), u.transpose().conjugate()))
+# }}} inv_SVD(A, svdlim, plotsigma=False)
 
 
+# {{{ def inv_reg1(A, regparam):
 def inv_reg1(A, regparam):
     """Computes the regularized inverse using identity matrix as a
     regularization.
@@ -482,13 +503,15 @@ def inv_reg1(A, regparam):
 
     """
     Ashape = A.shape[0]
-    return np.linalg.inv(A.transpose().conjugate().dot(A) +
-                         regparam * np.identity(Ashape)).dot(
-                             A.transpose().conjugate())
+    Atr = A.transpose().copy()
+    return np.linalg.inv(Atr.conjugate().dot(A) +
+                         regparam * np.identity(Ashape)).dot(Atr.conjugate())
+# }}} inv_reg1(A, regparam)
 
 
+# {{{ def inv_reg1supp(A, regparam):
 def inv_reg1supp(A, regparam):
-    """Computes the regularized inverse using diagonal matrix as a 
+    """Computes the regularized inverse using diagonal matrix as a
     regularization. Different weights are given to u, v, w.
 
     Parameters:
@@ -501,7 +524,7 @@ def inv_reg1supp(A, regparam):
     Returns:
     --------
     regularized inverse of A
-    
+
     """
     Ashape = A.shape[0]
     iden = np.identity(Ashape)
@@ -515,8 +538,10 @@ def inv_reg1supp(A, regparam):
                          - regparam * 0.85 * regv.transpose().dot(regv)
                          + regparam * 7 * regu.transpose().dot(regu))\
                     .dot(A.transpose().conjugate())
+# }}} inv_reg1supp(A, regparam)
 
 
+# {{{ def inv_reg2(A, regparam):
 def inv_reg2(A, regparam):
     """Computes the regularized inverse using D2 operator as regularization.
 
@@ -540,8 +565,10 @@ def inv_reg2(A, regparam):
     return np.linalg.inv(A.transpose().dot(A)
                          + (regparam/16.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
+# }}} inv_reg2(A, regparam)
 
 
+# {{{ def inv_reg3(A, regparam):
 def inv_reg3(A, regparam):
     """Computes the regularized inverse using D3 operator as regularization.
     Parameters:
@@ -565,8 +592,10 @@ def inv_reg3(A, regparam):
     return np.linalg.inv(A.transpose().dot(A)
                          + (regparam/64.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
+# }}} inv_reg3(A, regparam)
 
 
+# {{{ def get_only_t(lmax, t, alm, ellArr, emmArr):
 def get_only_t(lmax, t, alm, ellArr, emmArr):
     """Filter out the spectral coefficients corresponding to a given
     azimuthal order t.
@@ -594,8 +623,10 @@ def get_only_t(lmax, t, alm, ellArr, emmArr):
     isel = ((ellArr >= t) * (ellArr <= lmax))
     mask = ist * isel
     return alm[mask]
+# }}} get_only_t(lmax, t, alm, ellArr, emmArr)
 
 
+# {{{ def put_only_t(lmax, t, alm, almFull, ellArr, emmArr):
 def put_only_t(lmax, t, alm, almFull, ellArr, emmArr):
     """Updates the full array of spectral coefficients with the
     coefficients of a given t.
@@ -626,8 +657,10 @@ def put_only_t(lmax, t, alm, almFull, ellArr, emmArr):
     mask = ist * isel
     almFull[mask] = alm
     return almFull
+# }}} put_only_t(lmax, t, alm, almFull, ellArr, emmArr)
 
 
+# {{{ def deconcat(alm):
 def deconcat(alm):
     '''Deconcatenates full array into the componets of ulm, vlm, wlm.
 
@@ -652,13 +685,15 @@ def deconcat(alm):
     alm2 = alm[deconsize:2*deconsize]
     alm3 = alm[2*deconsize:]
     return alm1, alm2, alm3
+# }}} deconcat(alm)
 
 
+# {{{ def get_a_ainv(t, args):
 def get_a_ainv(t, args):
     if args.synth:
         if args.magneto:
             A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
-            Ainv = inv_reg1supp(A, 1e-3)
+            Ainv = inv_reg1(A, 5e-4)
         else:
             if args.fat:
                 if args.read:
@@ -707,8 +742,10 @@ def get_a_ainv(t, args):
         A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
         Ainv = inv_reg1supp(A, 1e-3)
     return A, Ainv
+# }}} get_a_ainv(t, args)
 
 
+# {{{ def computePS(alm, lmax, ellArr, emmArr):
 def computePS(alm, lmax, ellArr, emmArr):
     '''Computes the power spectrum given the spectral coefficients.
 
@@ -738,47 +775,56 @@ def computePS(alm, lmax, ellArr, emmArr):
         isel = ellArr == i
         ps[i] += (abs(alm[isel])**2).sum() * i  # / (2*i + 1)
     return np.sqrt(ps)
+# }}} computePS(alm, lmax, ellArr, emmArr)
 
 
-def plot_inv_actual(inv, act, ell):
+# {{{ def plot_inv_actual(inv, act, ell, args):
+def plot_inv_actual(inv, act, ell, args):
+    if args.magneto:
+        yaxis_label = "Magnetic field in G"
+        title_suffix = "magnetic field"
+    else:
+        yaxis_label = "velocity in ms$^{-1}$"
+        title_suffix = "velocity"
     inv_total = np.sqrt(inv[0]**2 + inv[1]**2 + inv[2]**2)
     act_total = np.sqrt(act[0]**2 + act[1]**2 + act[2]**2)
     fig = plt.figure(figsize=(10, 10))
     plt.rcParams.update({'font.size': 15})
     plt.subplot(221)
-    plt.title("Radial velocity")
-    plt.loglog(np.sqrt(ell * inv[0]), 'g-.', label='$u_{lm}$ - inverted')
-    plt.loglog(np.sqrt(ell * act[0]), 'g', label='$u_{lm}$ - actual')
+    plt.title(f"Radial {title_suffix}")
+    plt.loglog(np.sqrt(ell * inv[0]), 'g-.', label='inverted')
+    plt.loglog(np.sqrt(ell * act[0]), 'g', label='actual')
     plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel("velocity in ms$^{-1}$")
+    plt.ylabel(yaxis_label)
     plt.legend()
 
     plt.subplot(222)
-    plt.title("Poloidal velocity")
-    plt.loglog(np.sqrt(ell * inv[1]), 'r-.', label='$v_{lm}$ - inverted')
-    plt.loglog(np.sqrt(ell * act[1]), 'r', label='$v_{lm}$ - actual')
+    plt.title(f"Poloidal {title_suffix}")
+    plt.loglog(np.sqrt(ell * inv[1]), 'r-.', label='inverted')
+    plt.loglog(np.sqrt(ell * act[1]), 'r', label='actual')
     plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel("velocity in ms$^{-1}$")
+    plt.ylabel(yaxis_label)
     plt.legend()
 
     plt.subplot(223)
-    plt.title("Toroidal velocity")
-    plt.loglog(np.sqrt(ell * inv[2]), 'b-.', label='$w_{lm}$ - inverted')
-    plt.loglog(np.sqrt(ell * act[2]), 'b', label='$w_{lm}$ - actual')
+    plt.title(f"Toroidal {title_suffix}")
+    plt.loglog(np.sqrt(ell * inv[2]), 'b-.', label='inverted')
+    plt.loglog(np.sqrt(ell * act[2]), 'b', label='actual')
     plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel("velocity in ms$^{-1}$")
+    plt.ylabel(yaxis_label)
     plt.legend()
 
     plt.subplot(224)
-    plt.title("Total velocity")
+    plt.title(f"Total {title_suffix}")
     plt.loglog(np.sqrt(ell * inv_total), color='black',
                linestyle='-.', label='inverted')
     plt.loglog(np.sqrt(ell * act_total), 'black', label='actual')
     plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel("velocity in ms$^{-1}$")
+    plt.ylabel(yaxis_label)
     plt.legend()
     plt.tight_layout()
     return fig
+# }}} plot_inv_actual(inv, act, ell, args)
 
 
 if __name__ == "__main__":
@@ -979,7 +1025,7 @@ if __name__ == "__main__":
         pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
         pstotth = np.sqrt(psuth**2 + psvth**2 + pswth**2)
 
-        fig = plot_inv_actual((psu, psv, psw), (psuth, psvth, pswth), ell)
+        fig = plot_inv_actual((psu, psv, psw), (psuth, psvth, pswth), ell, args)
         plt.show()
         """
         phSize = 2*thSize
