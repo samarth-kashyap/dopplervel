@@ -1,13 +1,13 @@
-from pyshtools import legendre as pleg     # Legendre polynomials
-from scipy.integrate import simps          # Integration - simpsons
+# {{{ Library imports
 import matplotlib.pyplot as plt            # Plotting
-from math import sqrt, pi, e               # Math constants
+from heliosPy import iofuncs as cio
 import healpy as hp
 import numpy as np
 import argparse
-import time
-import os
+# }}} imports
 
+
+# {{{ ArgumentParser
 parser = argparse.ArgumentParser()
 parser.add_argument('--hpc', help="Run program on daahpc",
                     action="store_true")
@@ -24,18 +24,20 @@ if args.cchpc:
 else:
     home_dir = "/home/samarthgk/cchpchome/"
     scratch_dir = "/home/samarthgk/cchpcscratch/"
+# }}} parser
 
 data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
 NTIME = 300
 
 
+# {{{ def load_time_series(NTIME, data_dir):
 def load_time_series(NTIME, data_dir):
     '''Loads time series of alms by reading alms of each image.
 
     Parameters:
     -----------
-    NTIME - int 
-        length of the time series 
+    NTIME - int
+        length of the time series
     data_dir - string
         directory in which the alms of the image is located
 
@@ -62,6 +64,7 @@ def load_time_series(NTIME, data_dir):
             alm = np.load(fname)
             alm_found = True
         except FileNotFoundError:
+            print(f"{fname} not found")
             alm_found = False
             pass
         if count==0 and alm_found:
@@ -83,11 +86,14 @@ def load_time_series(NTIME, data_dir):
             utime[:, i] = alm['ulm']
             vtime[:, i] = alm['vlm']
             wtime[:, i] = alm['wlm']
-            if i%50==0:
+            if i%10==0:
                 print(f" i = {i} ")
     return utime, vtime, wtime
+# }}} load_time_series(NTIME, data_dir)
 
-def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s):
+
+# {{{ def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s, t):
+def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s, t):
     '''Takes the spectral coefficients and returns an array for a given s
 
     Parameters:
@@ -99,13 +105,13 @@ def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s):
     wfreq - np.ndarray(ndim=2, dtype=complex)
         frequency series of toroidal spherical harmonic
     ellArr - np.ndarray(ndim=1, dtype=int)
-        list of ell values 
+        list of ell values
     emmArr - np.ndarray(ndim=1, dtype=int)
-        list of emm values 
-    s - int 
-        spherical harmonic degree 
-    t - int 
-        azimuthal order 
+        list of emm values
+    s - int
+        spherical harmonic degree
+    t - int
+        azimuthal order
 
     Returns:
     --------
@@ -119,17 +125,19 @@ def get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s):
     '''
     len_alm = ufreq.shape[0]
     lmax = hp.sphtfunc.Alm.getlmax(len_alm)
-    assert s<=lmax and t<=s
-    isess = ellArr==s
-    istee = emmArr==t
+    assert (s <= lmax) and (t <= s)
+    isess = ellArr == s
+    istee = emmArr == t
     mask = isess * istee
     ufreq_st = ufreq[mask, :]
     vfreq_st = vfreq[mask, :]
     wfreq_st = wfreq[mask, :]
 
-    return ufreq_st, vfreq_st, w_freq_st
+    return ufreq_st, vfreq_st, wfreq_st
+# }}} get_s_plot(ufreq, vfreq, wfreq, ellArr, emmArr, s, t)
 
 
+# {{{ def get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax):
 def get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax):
     '''Takes the spectral coefficients and returns an array for a given s
 
@@ -142,10 +150,10 @@ def get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax):
     wfreq - np.ndarray(ndim=2, dtype=complex)
         frequency series of toroidal spherical harmonic
     ellArr - np.ndarray(ndim=1, dtype=int)
-        list of ell values 
+        list of ell values
     emmArr - np.ndarray(ndim=1, dtype=int)
-        list of emm values 
-    lmax - int 
+        list of emm values
+    lmax - int
         maximum value of ell upto which power is summed
 
     Returns:
@@ -176,17 +184,23 @@ def get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax):
             wfreq_st[st, :] += abs(wfreq[mask, :]).flatten()
     """
     for st in range(lmax+1):
-        mask = (ellArr - emmArr == st) * (ellArr<lmax) * (ellArr>=lmin)
+        mask = (ellArr - emmArr == st) * (ellArr < lmax) * (ellArr >= lmin)
         ufreq_st[st, :] += abs(ufreq[mask, :]).sum(axis=0)
         vfreq_st[st, :] += abs(vfreq[mask, :]).sum(axis=0)
         wfreq_st[st, :] += abs(wfreq[mask, :]).sum(axis=0)
     return ufreq_st, vfreq_st, wfreq_st
+# }}} get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, lmin, lmax)
 
+
+# {{{ def plot_all(ust, vst, wst, lmin, lmax):
 def plot_all(ust, vst, wst, lmin, lmax):
     xst = np.arange(lmax+1)
+
     plt.figure(figsize=(10, 10))
-    plt.title(f" Total power summed over smin = {lmin}, smax = {lmax}")
-    plt.rcParams.update({'font.size': 20})
+#    plt.rcParams.update({'font.size': 20})
+    plt.rc("text", usetex=True)
+    plt.rc("font", family="serif", size="20")
+    plt.title(" Total power summed over $s_{min}$ =" + f" {lmin}," +"$s_{max}$ = " + f"{lmax}")
     plt.semilogy(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
     plt.semilogy(xst, vst.sum(axis=1)/NTIME, 'r', label='poloidal')
     plt.semilogy(xst, wst.sum(axis=1)/NTIME, 'b', label='toroidal')
@@ -199,8 +213,10 @@ def plot_all(ust, vst, wst, lmin, lmax):
     plt.close()
 
     plt.figure(figsize=(10, 10))
-    plt.rcParams.update({'font.size': 20})
-    plt.title(f" Total power summed over smin = {lmin}, smax = {lmax}")
+#    plt.rcParams.update({'font.size': 20})
+    plt.rc("text", usetex=True)
+    plt.rc("font", family="serif", size="20")
+    plt.title(" Total power summed over $s_{min}$ =" + f" {lmin}," +"$s_{max}$ = " + f"{lmax}")
     plt.plot(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
     plt.plot(xst, vst.sum(axis=1)/NTIME, 'r', label='poloidal')
     plt.plot(xst, wst.sum(axis=1)/NTIME, 'b', label='toroidal')
@@ -212,7 +228,10 @@ def plot_all(ust, vst, wst, lmin, lmax):
     plt.savefig(plot_fname)
     plt.close()
     return None
+# }}} plot_all(ust, vst, wst, lmin, lmax)
 
+
+# {{{ def plot_freq(ust, vst, wst):
 def plot_freq(ust, vst, wst):
     plt.figure(figsize=(30, 20))
     plt.rcParams.update({'font.size': 15})
@@ -242,7 +261,10 @@ def plot_freq(ust, vst, wst):
     plt.tight_layout()
     plt.show()
     return None
+# }}} plot_freq(ust, vst, wst)
 
+
+# {{{ def analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax)
 def analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax):
     num_blocks = int(lmax/block_size)
     lmin, lmax = 0, 0
@@ -250,12 +272,15 @@ def analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax):
         print(f"Block number = {i+1} of {num_blocks-1}")
         lmin = lmax
         lmax = lmin + block_size
-        ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, lmin, lmax)
+        ust, vst, wst = get_st_plot(utime, vtime, wtime,
+                                    ellArr, emmArr, lmin, lmax)
         plot_all(ust, vst, wst, lmin, lmax)
     return None
+# }}} analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax)
+
 
 if __name__=="__main__":
-    max_time = NTIME*24*3600 # total time in seconds
+    max_time = NTIME*24*3600  # total time in seconds
     time_arr = np.linspace(0, max_time, NTIME)
     dtime = time_arr[1] - time_arr[0]
     freq_arr = np.fft.fftfreq(time_arr.shape[0], dtime)
@@ -265,6 +290,13 @@ if __name__=="__main__":
     length_alm = utime.shape[0]
     lmax = hp.sphtfunc.Alm.getlmax(length_alm)
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(lmax)
+    cio.writefitsfile(utime.real, data_dir + "utime1.fits")
+    cio.writefitsfile(utime.imag, data_dir + "utime2.fits")
+    cio.writefitsfile(vtime.real, data_dir + "vtime1.fits")
+    cio.writefitsfile(vtime.imag, data_dir + "vtime2.fits")
+    cio.writefitsfile(wtime.real, data_dir + "wtime1.fits")
+    cio.writefitsfile(wtime.imag, data_dir + "wtime2.fits")
+
     """
     ufreq = np.fft.fft(utime, axis=1, norm="ortho")
     vfreq = np.fft.fft(vtime, axis=1, norm="ortho")
@@ -284,8 +316,11 @@ if __name__=="__main__":
     plt.show()
     """
 
-    block_size = 100
-    analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
+#    block_size = 100
+#    analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
+
+    ##  ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, 0, 50)
+    ##  plot_all(ust, vst, wst, 0, 50)
 #    smax = 140
 #    ust, vst, wst = get_st_plot(ufreq, vfreq, wfreq, ellArr, emmArr, smax)
 #    ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, smax)
