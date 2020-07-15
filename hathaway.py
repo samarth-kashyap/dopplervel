@@ -1,8 +1,8 @@
 # {{{ Library imports
 from pyshtools import legendre as pleg
 from sunpy.coordinates import frames
-#from heliosPy import iofuncs as cio
 from sunpy.map import Map as spMap
+from globalvars import globalvars
 from astropy.io import fits
 import astropy.units as u
 import pickle as pkl
@@ -24,10 +24,7 @@ parser.add_argument('--gnup', help="Argument for gnuParallel",
                     type=int)
 args = parser.parse_args()
 
-if args.hpc:
-    scratch_dir = "/scratch/g.samarth/"
-else:
-    scratch_dir = "/home/samarthgk/hpcscratch/"
+gvar = globalvars()
 # }}} argument parser
 
 
@@ -139,6 +136,20 @@ def smooth(img):
 
 # {{{ def downsample(img, N):
 def downsample(img, N):
+    """Downsample images by factor N
+
+    Inputs:
+    -------
+    img - np.ndarray(ndim=2, dtype=float)
+        Image that needs to be downsampled
+    N - int
+        Number of smoothing steps
+
+    Returns:
+    --------
+    img - np.ndarray(ndim=2, dtype=np.float)
+        Downsampled image
+    """
     for i in range(N):
         img = smooth(img)
     return img
@@ -192,19 +203,25 @@ def inv_reg3(A, regparam):
     reg2[1:, :-1] += offd2
     reg2[:-2, 2:] += -offd2[1:, 1:]
     reg = reg2[1:-2, :].copy()
-    return np.linalg.inv(A.transpose().dot(A) \
-                + (regparam/64.) * reg.transpose().dot(reg))\
-                    .dot(A.transpose())
+    At = A.transpose().copy()
+    rt = reg.transpose().copy()
+#    return np.linalg.inv(A.transpose().dot(A) +
+#                         (regparam/64.) * reg.transpose().dot(reg))\
+#                    .dot(A.transpose())
+    return np.linalg.inv((At @ A) + (rt @ reg)*regparam/64.) @ At
 # }}} inv_reg3(A, regparam)
 
 
 if __name__ == "__main__":
-    hmi_data_dir = scratch_dir + "HMIDATA/v720s_dConS/2018/"
+    # {{{ directories
+    plot_dir = gvar.get_dir("plot")
+    hmi_data_dir = gvar.get_dir("hmidata")
     hmi_data_fnames = hmi_data_dir + "HMI_2018_filenames"
-    plot_dir = scratch_dir + "plots/dopplervel/"
     print("Program started -- reading files")
     print(f" HMI data fnames = {hmi_data_fnames}")
+    # }}} dirs
 
+    # 1. Reading HMI Dopplergrams
     with open(hmi_data_fnames, mode="r") as f:
         hmi_files = f.read().splitlines()
 
@@ -221,13 +238,14 @@ if __name__ == "__main__":
         daylist = np.arange(procid, total_days, nproc)
     elif args.gnup:
         daylist = np.array([args.gnup])
-        if args.gnup>total_days:
+        if args.gnup > total_days:
             print(f" Invalid argument for --gnup {args.gnup} . Must be " +
                   f" less than {total_days}")
             exit()
     else:
         daylist = np.arange(0, 2)
 
+    # 2. Creating SunPy maps
     for day in daylist:
         # loading HMI image as sunPy map
         hmi_map = spMap(hmi_data_dir + hmi_files[day])
@@ -260,14 +278,15 @@ if __name__ == "__main__":
         psi = np.arctan2(y, x)
 
         phi = np.zeros(psi.shape) * u.rad
-        phi[psi<0] = psi[psi<0] + 2*pi * u.rad
-        phi[~(psi<0)] = psi[~(psi<0)]
+        phi[psi < 0] = psi[psi < 0] + 2*pi * u.rad
+        phi[~(psi < 0)] = psi[~(psi < 0)]
         theta = np.arcsin(rho/hmi_map.rsun_meters)
 
         map_data = hmi_map.data.copy()
         mask_nan = ~np.isnan(map_data)
-        # -- ( plot ) determining maximum and minimum pixel values --
         """
+        # -----------------------------------------------------------
+        # -- ( plot ) determining maximum and minimum pixel values --
         # -----------------------------------------------------------
         _max_data = map_data[mask_nan].max()
         _min_data = map_data[mask_nan].min()
@@ -341,7 +360,7 @@ if __name__ == "__main__":
         tempFull = np.zeros((4096, 4096))
         tempFull[~mask_nan] = np.nan
 
-        map_data += velCorr 
+        map_data += velCorr
         map_data -= 632
 
         lat = hpc_hgf.lat.copy() + 90*u.deg
@@ -414,18 +433,6 @@ if __name__ == "__main__":
         newImg[mask_nan] = newImgArr
         newImg[~mask_nan] = np.nan
         resImg = map_data - newImg
-        """
-        cio.writefitsfile(map_data - newImg,
-                          hmi_data_dir + "residual"+str(day).zfill(3)+".fits")
-        cio.writefitsfile((hpc_hgf.lat + 90*u.deg).value,
-                          hmi_data_dir + "theta"+str(day).zfill(3)+".fits")
-        cio.writefitsfile(hpc_hgf.lon.value ,
-                          hmi_data_dir + "phi"+str(day).zfill(3)+".fits")
-        cio.writefitsfile(theta.value,
-                          hmi_data_dir + "thetaRot"+str(day).zfill(3)+".fits")
-        cio.writefitsfile(phi.value,
-                          hmi_data_dir + "phiRot"+str(day).zfill(3)+".fits")
-        """
         pkl.dump(map_data - newImg,
                 open(hmi_data_dir + "residual"+str(day).zfill(3)+".pkl","wb"))
         pkl.dump((hpc_hgf.lat + 90*u.deg).value,

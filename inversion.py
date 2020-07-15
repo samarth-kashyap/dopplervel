@@ -693,7 +693,9 @@ def get_a_ainv(t, args):
     if args.synth:
         if args.magneto:
             A = np.load(workingDir + "A"+str(t).zfill(4)+".npz")['A']
-            Ainv = inv_reg1(A, 5e-4)
+            reg_param = args.reg if args.reg else 5e-4
+            Ainv = inv_reg1supp(A, reg_param)
+#            Ainv = inv_SVD(A, 1e4)
         else:
             if args.fat:
                 if args.read:
@@ -705,7 +707,7 @@ def get_a_ainv(t, args):
                                         + "fatMat"+str(t).zfill(2)+".npz",
                                         A=A)
     #                Ainv = inv_SVD(A, 1e4)
-                Ainv = inv_reg1supp(A, 1e-3)
+                Ainv = inv_reg1(A, 1e-3)
             else:
                 if args.read:
                     A = np.load(workingDir
@@ -828,6 +830,7 @@ def plot_inv_actual(inv, act, ell, args):
 
 
 if __name__ == "__main__":
+    # {{{ argument parser
     parser = argparse.ArgumentParser()
     parser.add_argument('--hpc', help="Run program on daahpc",
                         action="store_true")
@@ -839,6 +842,8 @@ if __name__ == "__main__":
                         action="store_true")
     parser.add_argument('--magneto', help="Invert for magnetic field data",
                         action="store_true")
+    parser.add_argument("--reg", help="Regularization value",
+                        type=np.float)
     parser.add_argument('--read', help="Read matrix from file (for synthetic)",
                         action="store_true")
     parser.add_argument('--fat', help="Use fat matrix for inversion",
@@ -846,7 +851,9 @@ if __name__ == "__main__":
     parser.add_argument('--l1', help="L1 minimization - LASSO",
                         action="store_true")
     args = parser.parse_args()
+    # }}} argument parser
 
+    # {{{ directories
     if args.hpc:
         home_dir = "/home/samarth/"
         scratch_dir = "/scratch/samarth/"
@@ -866,11 +873,12 @@ if __name__ == "__main__":
         workingDir = scratch_dir + "matrixA/lmax1535/"
     data_dir = scratch_dir + "HMIDATA/data_analysis/"
     data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
+    # }}} directories
 
     if args.synth:
         if args.magneto:
             magneto_dir = "/scratch/g.samarth/HMIDATA/magnetogram/"
-            arrFile = np.load("datafiles/arrlm.npz")
+            arrFile = np.load(magneto_dir + "arrlm.npz")
             # contains arrays of ell and emm
             ellArr = arrFile['ellArr']
             emmArr = arrFile['emmArr']
@@ -989,8 +997,15 @@ if __name__ == "__main__":
     print(f"Total time taken = {(tn-t0)/60:.3f} minutes")
 
     if args.synth:
-        np.savez("almInv.npz", ulm=ulmA, vlm=vlmA, wlm=wlmA)
-        suffix = ".npz"
+        if args.magneto:
+            if args.gnup:
+                suffix = f"magneto.{args.gnup:02d}.npz"
+            else:
+                suffix = f"magneto.npz"
+        else:
+            suffix = ".npz"
+        fname = data_dir + "alm.syn.inv." + suffix
+        np.savez(fname, ulm=ulmA, vlm=vlmA, wlm=wlmA)
     else:
         if args.gnup:
             suffix = str(args.gnup).zfill(3) + ".npz"
@@ -1009,7 +1024,18 @@ if __name__ == "__main__":
 #    urA, utA, upA = vel_from_spectra_allt(ulmA, vlmA, wlmA,
 #                                    thSize, phSize, lmaxCalc)
 
-    if not args.synth:
+    if args.synth:
+        psuth = computePS(ulmAth, lmaxCalc, ellArr, emmArr)
+        psvth = computePS(vlmAth, lmaxCalc, ellArr, emmArr)
+        pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
+        pstotth = np.sqrt(psuth**2 + psvth**2 + pswth**2)
+
+        fig = plot_inv_actual((psu, psv, psw),
+                              (psuth, psvth, pswth),
+                              ell, args)
+        fig.savefig(fname + ".png")
+        plt.close(fig)
+    else:
         plt.figure()
         plt.loglog(psu, 'g', label='radial')
         plt.loglog(psv, 'r', label='poloidal')
@@ -1018,15 +1044,7 @@ if __name__ == "__main__":
         plt.ylabel('velocity $ms^{-1}$')
         plt.legend()
         plt.show()
-
-    if args.synth:
-        psuth = computePS(ulmAth, lmaxCalc, ellArr, emmArr)
-        psvth = computePS(vlmAth, lmaxCalc, ellArr, emmArr)
-        pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
-        pstotth = np.sqrt(psuth**2 + psvth**2 + pswth**2)
-
-        fig = plot_inv_actual((psu, psv, psw), (psuth, psvth, pswth), ell, args)
-        plt.show()
+ 
         """
         phSize = 2*thSize
         urA, utA, upA = vel_from_spectra_allt(ulmA, vlmA, wlmA, 
