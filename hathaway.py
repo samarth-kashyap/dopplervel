@@ -612,3 +612,4 @@ if __name__ == "__main__":
         del map_data, newImg, hpc_hgf, resImg, new1, new2, new3
         del newImgArr, fitParams, Ainv, imArr
         del dt_pl_rho, dt_pl_theta, st, ct, sp, cp
+# adding line from cchpc
