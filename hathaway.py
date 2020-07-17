@@ -13,7 +13,6 @@ import time
 import os
 # }}} imports
 
-
 # {{{ argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('--hpc', help="Run program on cluster",
@@ -51,7 +50,7 @@ def get_pleg_index(l, m):
 
 # {{{ def gen_leg(lmax, theta):
 def gen_leg(lmax, theta):
-    """Generates associated legendre polynomials and derivatives
+    """Generates associated legendre polynomials and derivatives (normalized)
 
     Parameters:
     -----------
@@ -66,9 +65,13 @@ def gen_leg(lmax, theta):
         Legendre polynomials and it's derivatives
     """
     cost = np.cos(theta)
-    sint = np.sin(theta)
+    sint = np.sin(theta).reshape(1, theta.shape[0])
+
     maxIndex = int(lmax+1)
-#    ell = np.arange(lmax+1)
+    ell = np.arange(maxIndex)
+    norm = np.sqrt(ell*(ell+1)).reshape(maxIndex, 1)
+    norm[norm == 0] = 1
+
     leg = np.zeros((maxIndex, theta.size))
     leg_d1 = np.zeros((maxIndex, theta.size))
 
@@ -76,15 +79,14 @@ def gen_leg(lmax, theta):
     for z in cost:
         leg[:, count], leg_d1[:, count] = pleg.PlBar_d1(lmax, z)
         count += 1
-    return leg/np.sqrt(2), \
-        leg_d1 * (-sint).reshape(1, sint.shape[0])/np.sqrt(2)
+    return leg/np.sqrt(2)/norm, leg_d1 * (-sint)/np.sqrt(2)/norm
 # }}} gen_leg(lmax, theta)
 
 
 # {{{ def gen_leg_x(lmax, x):
 def gen_leg_x(lmax, x):
     """Generates associated legendre polynomials and derivatives
-    for a given x
+    for a given x (normalized)
 
     Parameters:
     -----------
@@ -99,7 +101,10 @@ def gen_leg_x(lmax, x):
         Legendre polynomial and it's derivative
     """
     maxIndex = int(lmax+1)
-#    ell = np.arange(lmax+1)
+    ell = np.arange(maxIndex)
+    norm = np.sqrt(ell*(ell+1)).reshape(maxIndex, 1)
+    norm[norm == 0] = 1
+
     leg = np.zeros((maxIndex, x.size))
     leg_d1 = np.zeros((maxIndex, x.size))
 
@@ -107,7 +112,7 @@ def gen_leg_x(lmax, x):
     for z in x:
         leg[:, count], leg_d1[:, count] = pleg.PlBar_d1(lmax, z)
         count += 1
-    return leg/np.sqrt(2), leg_d1/np.sqrt(2)
+    return leg/np.sqrt(2)/norm, leg_d1/np.sqrt(2)/norm
 # }}} gen_leg_x(lmax, x)
 
 
@@ -212,6 +217,283 @@ def inv_reg3(A, regparam):
 # }}} inv_reg3(A, regparam)
 
 
+# {{{ def get_daylist(args, total_days):
+def get_daylist(args, total_days):
+    """Get the list of images that needbe processed
+
+    Parameters:
+    -----------
+    args - argument parser object
+        contains arguments passed during execution of program
+    total_days - int
+        total number of images present locally
+
+    Returns:
+    --------
+    daylist - np.ndarray(ndim=1, dtype=np.int)
+        list of image numbers
+
+    """
+    # ---- if submitted as pbsdsh job ----
+    if args.job:
+        try:
+            procid = int(os.environ['PBS_VNODENUM'])
+        except KeyError:
+            pass
+        nproc = 6
+        print(f" procid = {procid}")
+        daylist = np.arange(procid, total_days, nproc)
+    # --- if submitted as a gnup input file ---
+    elif args.gnup:
+        daylist = np.array([args.gnup])
+        if args.gnup > total_days:
+            print(f" Invalid argument for --gnup {args.gnup} . Must be " +
+                  f" less than {total_days}")
+            exit()
+    # --- if computed as a script from terminal ---
+    else:
+        daylist = np.arange(0, 2)
+    return daylist
+# }}} get_daylist(args, total_days)
+
+
+class hmiClass():
+    """Class to handle mi maps and their coordinates
+
+    """
+    # {{{ def __init__(self, hmi_data_dir, hmi_file):
+    def __init__(self, hmi_data_dir, hmi_file):
+        self.rsun_rel = 200
+        self.fname = hmi_data_dir + hmi_file
+        hmi_map = spMap(self.fname)
+
+        self.B0 = hmi_map.observer_coordinate.lat
+        self.P0 = hmi_map.observer_coordinate.lon
+
+        x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
+            * u.pix
+        hpc_coords = hmi_map.pixel_to_world(x, y)
+        r = np.sqrt(hpc_coords.Tx ** 2 + hpc_coords.Ty ** 2)\
+            / hmi_map.rsun_obs
+
+        self.coords_r = r.copy()
+
+        # removing all data beyond rcrop (heliocentric radius)
+        rcrop = 0.95
+        mask_r = r > rcrop
+
+        hmi_map.data[mask_r] = np.nan
+        r[mask_r] = np.nan
+        self.r = r
+
+        hpc_hgf = hpc_coords.transform_to(frames.HeliographicStonyhurst)
+        hpc_hc = hpc_coords.transform_to(frames.Heliocentric)
+
+        self.lat = hpc_hgf.lat
+        self.lon = hpc_hc.lon
+
+        self.coords_hc_x = hpc_hc.x.copy()
+        self.coords_hc_y = hpc_hc.y.copy()
+        rho = np.sqrt(self.coords_hc_x**2 + self.coords_hc_y**2)
+        psi = np.arctan2(self.coords_hc_y, self.coords_hc_x)
+        phi = np.zeros(psi.shape) * u.rad
+        phi[psi < 0] = psi[psi < 0] + (2*pi)*u.rad
+        phi[~(psi < 0)] = psi[~(psi < 0)]
+        theta = np.arcsin(rho/hmi_map.rsun_meters)
+
+        self.coords_theta = theta
+        self.coords_phi = phi
+
+        del theta, phi
+
+        self.map_data = hmi_map.data.copy()
+        self.mask_nan = ~np.isnan(map_data)
+        return None
+    # }}} __init__(self, hmi_data_dir, hmi_file)
+
+    # {{{ def get_sat_vel(self):
+    def get_sat_vel(self):
+        map_fits = fits.open(self.fname)
+        map_fits.verify('fix')
+        vx = map_fits[1].header['OBS_VR']
+        vz = map_fits[1].header['OBS_VN']
+        vy = map_fits[1].header['OBS_VW']
+        self.sat_VR, self.sat_VN, self.sat_VW = vx, vz, vy
+        self.sat_VX, self.sat_VY, self.sat_VZ = vx, vy, vz
+        print(f"VR = {self.sat_VR}, VN = {self.sat_VN}, VW = {self.sat_VW}")
+        return None
+    # }}} get_sat_vel(self)
+
+    # {{{ def remove_grav_redshift(self):
+    def remove_grav_redshift(self):
+        self.map_data -= 632
+    # }}} remove_grav_redshift(self)
+
+    # {{{ def remove_sat_vel(self, method):
+    def remove_sat_vel(self, method):
+        self.get_sat_vel()
+        if method == 1:
+            # thetaHGC = self.HGF.lat.copy()  # + 90*u.deg
+            # phiHGC = self.HGF.lon.copy()
+            thHG1 = self.lat[self.mask_nan]
+            phHG1 = self.lon[self.mask_nan]
+
+            ct, st = np.cos(thHG1), np.sin(thHG1)
+            cp, sp = np.cos(phHG1), np.sin(phHG1)
+
+            vr1 = cp*st*self.sat_VX + sp*st*self.sat_VY + ct*self.sat_VZ
+            vt1 = cp*ct*self.sat_VX + sp*ct*self.sat_VY - st*self.sat_VZ
+            vp1 = -sp*self.sat_VX + cp*self.sat_VY
+
+            # Getting the line of sight vector (lr, lt, lp)
+            sB0 = np.sin(self.B0)
+            cB0 = np.cos(self.B0)
+            lr = sB0*ct + cB0*st*cp
+            lt = sB0*st - cB0*ct*cp
+            lp = cB0*sp
+
+            vC1 = lr*vr1 + lt*vt1 + lp*vp1
+            velCorr = np.zeros((4096, 4096))
+            velCorr[self.mask_nan] = vC1
+            velCorr[~self.mask_nan] = np.nan
+
+        elif method == 2:
+            sigma = np.arctan(self.coords_r/self.rsun_rel)
+            chi = np.arctan2(self.coords_hc_x, self.coords_hc_y)
+            ssig, csig = np.sin(sigma), np.cos(sigma)
+            schi, cchi = np.sin(chi), np.cos(chi)
+
+            vr1 = self.sat_VR*csig
+            vr2 = -self.sat_VW*ssig*schi
+            vr3 = -self.sat_VN*ssig*cchi
+            vC1 = vr1 + vr2 + vr3
+            velCorr = np.zeros((4096, 4096))
+            velCorr[self.mask_nan] = vC1[self.mask_nan]  # + 632
+            velCorr[~self.mask_nan] = np.nan
+
+        self.map_data += velCorr
+        return None
+    # }}} remove_sat_vel(self, method)
+
+    def remove_large_features(self):
+        lat = self.lat + 90*u.deg
+        lon = self.lon
+        cB0 = np.cos(self.B0)
+        sB0 = np.sin(self.B0)
+
+        lat1D = lat[self.mask_nan].copy()
+        lon1D = lon[self.mask_nan].copy()
+        rho1D = self.r[self.mask_nan].copy()
+        ct, st = np.cos(lat1D), np.sin(lat1D)
+        cp, sp = np.cos(lon1D), np.sin(lon1D)
+
+        print("-- Generating Legendre polynomials")
+        t1 = time.time()
+        pl_theta, dt_pl_theta = gen_leg(5, lat1D)
+        t2 = time.time()
+        print(f"--- Time taken for pl_theta = {(t2 - t1)/60} minutes")
+        pl_rho, dt_pl_rho = gen_leg_x(5, rho1D)
+        t3 = time.time()
+        print(f"--- Time taken for pl_rho = {(t3 - t2)/60} minutes")
+
+        lt = sB0 * st - cB0 * ct * cp
+        lp = cB0 * sp
+        imArr = np.zeros((11, lt.shape[0]))
+        A = np.zeros((11, 11))
+        imArr[0, :] = dt_pl_theta[1, :] * lp
+        imArr[1, :] = dt_pl_theta[3, :] * lp
+        imArr[2, :] = dt_pl_theta[5, :] * lp
+
+        #  imArr[3, :] = dt_pl_theta[0, :] * lt
+        imArr[3, :] = dt_pl_theta[2, :] * lt
+        imArr[4, :] = dt_pl_theta[4, :] * lt
+
+        imArr[5, :] = pl_rho[0, :]
+        imArr[6, :] = pl_rho[1, :]
+        imArr[7, :] = pl_rho[2, :]
+        imArr[8, :] = pl_rho[3, :]
+        imArr[9, :] = pl_rho[4, :]
+        imArr[10, :] = pl_rho[5, :]
+
+        mapArr = self.map_data[self.mask_nan].copy()
+
+        RHS = imArr.dot(mapArr)
+
+        for i in range(11):
+            for j in range(11):
+                A[i, j] = imArr[i, :].dot(imArr[j, :])
+
+        Ainv = inv_SVD(A, 1e5)
+        fitParams = Ainv.dot(RHS)
+        print(f" ##(in m/s)## Rotation = {fitParams[:3]},"
+              + f"\nMeridional Circ = {fitParams[3:5]},"
+              + f"\nLimb Shift = {fitParams[5:]}\n")
+        print(f" ##(in Hz)## Rotation = {fitParams[:3]/2/pi/0.695}")
+        newImgArr = fitParams.dot(imArr)
+        new1 = fitParams[:3].dot(imArr[:3, :])
+        new2 = fitParams[3:5].dot(imArr[3:5, :])
+        new3 = fitParams[5:].dot(imArr[5:, :])
+
+
+
+def get_map_data():
+    # loading HMI image as sunPy map
+    hmi_map = spMap(hmi_data_dir + hmi_files[day])
+
+    # Getting the B0 and P0 angles
+    B0 = hmi_map.observer_coordinate.lat
+    P0 = hmi_map.observer_coordinate.lon
+
+    # setting up for data cleaning
+    x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
+        * u.pix
+    hpc_coords = hmi_map.pixel_to_world(x, y)
+    r = np.sqrt(hpc_coords.Tx ** 2 + hpc_coords.Ty ** 2)\
+        / hmi_map.rsun_obs
+
+    # removing all data beyond rcrop (heliocentric radius)
+    rcrop = 0.95
+    mask_r = r > rcrop
+
+    hmi_map.data[mask_r] = np.nan
+    r[mask_r] = np.nan
+
+    hpc_hgf = hpc_coords.transform_to(frames.HeliographicStonyhurst)
+    hpc_hc = hpc_coords.transform_to(frames.Heliocentric)
+
+    x = hpc_hc.x.copy()
+    y = hpc_hc.y.copy()
+    z = hpc_hc.z.copy()
+    rho = np.sqrt(x**2 + y**2)
+    psi = np.arctan2(y, x)
+
+    phi = np.zeros(psi.shape) * u.rad
+    phi[psi < 0] = psi[psi < 0] + 2*pi * u.rad
+    phi[~(psi < 0)] = psi[~(psi < 0)]
+    theta = np.arcsin(rho/hmi_map.rsun_meters)
+
+    map_data = hmi_map.data.copy()
+    mask_nan = ~np.isnan(map_data)
+    """
+    # -----------------------------------------------------------
+    # -- ( plot ) determining maximum and minimum pixel values --
+    # -----------------------------------------------------------
+    _max_data = map_data[mask_nan].max()
+    _min_data = map_data[mask_nan].min()
+    maxx = max(abs(_max_data), abs(_min_data))
+    print(_max_data, _min_data)
+    del map_data, _max_data, _min_data
+    plt.figure()
+    im = plt.imshow(hmi_map.data, cmap='seismic', interpolation="none")
+    plt.colorbar(im)
+    plt.axis("off")
+    plt.savefig(plot_dir + "rawMap.png", dpi=500)
+    plt.show()
+    # -----------------------------------------------------------
+    """
+
+   
+
 if __name__ == "__main__":
     # {{{ directories
     plot_dir = gvar.get_dir("plot")
@@ -226,82 +508,12 @@ if __name__ == "__main__":
         hmi_files = f.read().splitlines()
 
     total_days = len(hmi_files)
+    daylist = get_daylist(args, total_days)
     print(f"Total days = {total_days}")
-
-    if args.job:
-        try:
-            procid = int(os.environ['PBS_VNODENUM'])
-        except KeyError:
-            pass
-        nproc = 6
-        print(f" procid = {procid}")
-        daylist = np.arange(procid, total_days, nproc)
-    elif args.gnup:
-        daylist = np.array([args.gnup])
-        if args.gnup > total_days:
-            print(f" Invalid argument for --gnup {args.gnup} . Must be " +
-                  f" less than {total_days}")
-            exit()
-    else:
-        daylist = np.arange(0, 2)
 
     # 2. Creating SunPy maps
     for day in daylist:
-        # loading HMI image as sunPy map
-        hmi_map = spMap(hmi_data_dir + hmi_files[day])
-
-        # Getting the B0 and P0 angles
-        B0 = hmi_map.observer_coordinate.lat
-        P0 = hmi_map.observer_coordinate.lon
-
-        # setting up for data cleaning
-        x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
-            * u.pix
-        hpc_coords = hmi_map.pixel_to_world(x, y)
-        r = np.sqrt(hpc_coords.Tx ** 2 + hpc_coords.Ty ** 2)\
-            / hmi_map.rsun_obs
-
-        # removing all data beyond rcrop (heliocentric radius)
-        rcrop = 0.95
-        mask_r = r > rcrop
-
-        hmi_map.data[mask_r] = np.nan
-        r[mask_r] = np.nan
-
-        hpc_hgf = hpc_coords.transform_to(frames.HeliographicStonyhurst)
-        hpc_hc = hpc_coords.transform_to(frames.Heliocentric)
-
-        x = hpc_hc.x.copy()
-        y = hpc_hc.y.copy()
-        z = hpc_hc.z.copy()
-        rho = np.sqrt(x**2 + y**2)
-        psi = np.arctan2(y, x)
-
-        phi = np.zeros(psi.shape) * u.rad
-        phi[psi < 0] = psi[psi < 0] + 2*pi * u.rad
-        phi[~(psi < 0)] = psi[~(psi < 0)]
-        theta = np.arcsin(rho/hmi_map.rsun_meters)
-
-        map_data = hmi_map.data.copy()
-        mask_nan = ~np.isnan(map_data)
-        """
-        # -----------------------------------------------------------
-        # -- ( plot ) determining maximum and minimum pixel values --
-        # -----------------------------------------------------------
-        _max_data = map_data[mask_nan].max()
-        _min_data = map_data[mask_nan].min()
-        maxx = max(abs(_max_data), abs(_min_data))
-        print(_max_data, _min_data)
-        del map_data, _max_data, _min_data
-        plt.figure()
-        im = plt.imshow(hmi_map.data, cmap='seismic', interpolation="none")
-        plt.colorbar(im)
-        plt.axis("off")
-        plt.savefig(plot_dir + "rawMap.png", dpi=500)
-        plt.show()
-        # -----------------------------------------------------------
-        """
-
+        get_map_data()
         # Removing effect of satellite velocity
         map_fits = fits.open(hmi_data_dir + hmi_files[0])
         map_fits.verify('fix')
@@ -384,10 +596,6 @@ if __name__ == "__main__":
         pl_rho, dt_pl_rho = gen_leg_x(5, rho1D)
         t3 = time.time()
         print(f"Time taken for pl_rho = {(t3 - t2)/60} minutes")
-
-        # Normalizing the functions
-        dt_pl_theta /= np.sqrt(ell*(ell+1)).reshape(6, 1)
-        dt_pl_rho /= np.sqrt(ell*(ell+1)).reshape(6, 1)
 
         lt = sB0 * st - cB0 * ct * cp
         lp = cB0 * sp
