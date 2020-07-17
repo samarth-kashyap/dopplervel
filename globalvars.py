@@ -19,3 +19,5 @@ class DopplerVars():
         if dirname == "plot":
             return f"{self.scratch}/plots/dopplervel/"
         return None
+
+# adding lines from iMac
