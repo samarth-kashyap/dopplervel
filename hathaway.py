@@ -6,7 +6,6 @@ from globalvars import globalvars
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import astropy.units as u
-import pickle as pkl
 from math import pi
 import numpy as np
 import argparse
