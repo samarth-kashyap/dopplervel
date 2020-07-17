@@ -1,3 +1,7 @@
+"""Contains class to handle global variables
+
+"""
+
 class DopplerVars():
     """Class to handle all the global variables and 
     parameters

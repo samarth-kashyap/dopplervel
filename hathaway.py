@@ -263,6 +263,7 @@ class hmiClass():
     """
     # {{{ def __init__(self, hmi_data_dir, hmi_file):
     def __init__(self, hmi_data_dir, hmi_file):
+        print(f"Loading {hmi_file}")
         self.rsun_rel = 200
         self.fname = hmi_data_dir + hmi_file
         hmi_map = spMap(self.fname)
@@ -434,65 +435,22 @@ class hmiClass():
         new2 = fitParams[3:5].dot(imArr[3:5, :])
         new3 = fitParams[5:].dot(imArr[5:, :])
 
+        newImg = np.zeros((4096, 4096))
+        newImg[self.mask_nan] = newImgArr
+        newImg[~self.mask_nan] = np.nan
+        self.map_data -= newImg
+        # resImg = map_data - newImg
+        pkl.dump(map_data - newImg,
+                open(hmi_data_dir + "residual"+str(day).zfill(3)+".pkl","wb"))
+        pkl.dump((hpc_hgf.lat + 90*u.deg).value,
+                open(hmi_data_dir + "theta"+str(day).zfill(3)+".pkl","wb"))
+        pkl.dump(hpc_hgf.lon.value,
+                open(hmi_data_dir + "phi"+str(day).zfill(3)+".pkl","wb"))
+        pkl.dump(theta.value,
+                open(hmi_data_dir + "thetaRot"+str(day).zfill(3)+".pkl","wb"))
+        pkl.dump(phi.value, 
+                open(hmi_data_dir + "phiRot"+str(day).zfill(3)+".pkl","wb"))
 
-
-def get_map_data():
-    # loading HMI image as sunPy map
-    hmi_map = spMap(hmi_data_dir + hmi_files[day])
-
-    # Getting the B0 and P0 angles
-    B0 = hmi_map.observer_coordinate.lat
-    P0 = hmi_map.observer_coordinate.lon
-
-    # setting up for data cleaning
-    x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
-        * u.pix
-    hpc_coords = hmi_map.pixel_to_world(x, y)
-    r = np.sqrt(hpc_coords.Tx ** 2 + hpc_coords.Ty ** 2)\
-        / hmi_map.rsun_obs
-
-    # removing all data beyond rcrop (heliocentric radius)
-    rcrop = 0.95
-    mask_r = r > rcrop
-
-    hmi_map.data[mask_r] = np.nan
-    r[mask_r] = np.nan
-
-    hpc_hgf = hpc_coords.transform_to(frames.HeliographicStonyhurst)
-    hpc_hc = hpc_coords.transform_to(frames.Heliocentric)
-
-    x = hpc_hc.x.copy()
-    y = hpc_hc.y.copy()
-    z = hpc_hc.z.copy()
-    rho = np.sqrt(x**2 + y**2)
-    psi = np.arctan2(y, x)
-
-    phi = np.zeros(psi.shape) * u.rad
-    phi[psi < 0] = psi[psi < 0] + 2*pi * u.rad
-    phi[~(psi < 0)] = psi[~(psi < 0)]
-    theta = np.arcsin(rho/hmi_map.rsun_meters)
-
-    map_data = hmi_map.data.copy()
-    mask_nan = ~np.isnan(map_data)
-    """
-    # -----------------------------------------------------------
-    # -- ( plot ) determining maximum and minimum pixel values --
-    # -----------------------------------------------------------
-    _max_data = map_data[mask_nan].max()
-    _min_data = map_data[mask_nan].min()
-    maxx = max(abs(_max_data), abs(_min_data))
-    print(_max_data, _min_data)
-    del map_data, _max_data, _min_data
-    plt.figure()
-    im = plt.imshow(hmi_map.data, cmap='seismic', interpolation="none")
-    plt.colorbar(im)
-    plt.axis("off")
-    plt.savefig(plot_dir + "rawMap.png", dpi=500)
-    plt.show()
-    # -----------------------------------------------------------
-    """
-
-   
 
 if __name__ == "__main__":
     # {{{ directories
