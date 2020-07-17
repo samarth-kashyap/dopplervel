@@ -2,11 +2,10 @@
 from pyshtools import legendre as pleg
 from sunpy.coordinates import frames
 from sunpy.map import Map as spMap
-from globalvars import globalvars
+from globalvars import DopplerVars
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import astropy.units as u
-import pickle as pkl
 from math import pi
 import numpy as np
 import argparse
@@ -16,8 +15,6 @@ import os
 
 # {{{ argument parser
 parser = argparse.ArgumentParser()
-parser.add_argument('--hpc', help="Run program on cluster",
-                    action="store_true")
 parser.add_argument('--job', help="Submit as a job (PBS)",
                     action="store_true")
 parser.add_argument('--plot_fits', help="Plot fitted large scale features",
@@ -26,7 +23,7 @@ parser.add_argument('--gnup', help="Argument for gnuParallel",
                     type=int)
 args = parser.parse_args()
 
-gvar = globalvars()
+gvar = DopplerVars()
 # }}} argument parser
 
 
@@ -119,51 +116,6 @@ def gen_leg_x(lmax, x):
 # }}} gen_leg_x(lmax, x)
 
 
-# {{{ def smooth(img):
-def smooth(img):
-    """Smoothen by averaging over neighboring pixels.
-
-    Parameters:
-    -----------
-    img : np.ndarray(ndim=2, dtype=np.float64)
-        Input image
-
-    Returns:
-    --------
-    avg_img : np.ndarray(ndim=2, dtype=np.float64)
-        Smoothened image
-    """
-    avg_img = (img[1:-1, 1:-1] +  # center
-               img[:-2, 1:-1] +   # top
-               img[2:, 1:-1] +    # bottom
-               img[1:-1, :-2] +   # left
-               img[1:-1, 2:]) / 5.0     # right
-    return avg_img
-# }}} smooth(img)
-
-
-# {{{ def downsample(img, N):
-def downsample(img, N):
-    """Downsample images by factor N
-
-    Inputs:
-    -------
-    img - np.ndarray(ndim=2, dtype=float)
-        Image that needs to be downsampled
-    N - int
-        Number of smoothing steps
-
-    Returns:
-    --------
-    img - np.ndarray(ndim=2, dtype=np.float)
-        Downsampled image
-    """
-    for i in range(N):
-        img = smooth(img)
-    return img
-# }}} downsample(img, N)
-
-
 # {{{ def inv_SVD(A, svdlim):
 def inv_SVD(A, svdlim):
     u, s, v = np.linalg.svd(A, full_matrices=False)
@@ -179,45 +131,6 @@ def inv_SVD(A, svdlim):
     return np.dot(v.transpose().conjugate(),
                   np.dot(np.diag(sinv), u.transpose().conjugate()))
 # }}} inv_SVD(A, svdlim)
-
-
-# {{{ def inv_reg1(A, regparam):
-def inv_reg1(A, regparam):
-    Ashape = A.shape[0]
-    return np.linalg.inv(A.transpose().conjugate().dot(A) +
-                         regparam *
-                         np.identity(Ashape)).dot(A.transpose().conjugate())
-# }}} inv_reg1(A, regparam)
-
-
-# {{{ def inv_reg2(A, regparam):
-def inv_reg2(A, regparam):
-    reg2 = 2*np.identity(A.shape[0])
-    offd2 = -1*np.identity(A.shape[0]-1)
-    reg2[1:, :-1] += offd2
-    reg2[:-1, 1:] += offd2
-    reg = reg2[1:-1, :].copy()
-    return np.linalg.inv(A.transpose().dot(A) +
-                         (regparam/16.) *
-                         reg.transpose().dot(reg)).dot(A.transpose())
-# }}} inv_reg2(A, regparam)
-
-
-# {{{ def inv_reg3(A, regparam):
-def inv_reg3(A, regparam):
-    reg2 = 3*np.identity(A.shape[0])
-    offd2 = -1*np.identity(A.shape[0]-1)
-    reg2[:-1, 1:] += 3*offd2
-    reg2[1:, :-1] += offd2
-    reg2[:-2, 2:] += -offd2[1:, 1:]
-    reg = reg2[1:-2, :].copy()
-    At = A.transpose().copy()
-    rt = reg.transpose().copy()
-#    return np.linalg.inv(A.transpose().dot(A) +
-#                         (regparam/64.) * reg.transpose().dot(reg))\
-#                    .dot(A.transpose())
-    return np.linalg.inv((At @ A) + (rt @ reg)*regparam/64.) @ At
-# }}} inv_reg3(A, regparam)
 
 
 # {{{ def get_daylist(args, total_days):
@@ -296,7 +209,7 @@ class HmiClass():
         self.coords_hc_x = hpc_hc.x.copy()
         self.coords_hc_y = hpc_hc.y.copy()
         self.map_data = hmi_map.data.copy()
-        self.mask_nan = ~np.isnan(map_data)
+        self.mask_nan = ~np.isnan(self.map_data)
         return None
     # }}} __init__(self, hmi_data_dir, hmi_file, day)
 
@@ -308,10 +221,10 @@ class HmiClass():
         ph[psi < 0] = psi[psi < 0] + (2*pi)*u.rad
         ph[~(psi < 0)] = psi[~(psi < 0)]
         th = np.arcsin(rho/self.rsun_meters)
-        print(f"Writing {gvar.outdir}thDC_{self.year}_{self.day:03d}.npy")
-        np.save(f"{gvar.outdir}thDC_{self.year}_{self.day:03d}.npy", th.value)
-        print(f"Writing {gvar.outdir}phDC_{self.year}_{self.day:03d}.npy")
-        np.save(f"{gvar.outdir}phDC_{self.year}_{self.day:03d}.npy", ph.value)
+        print(f"Writing {gvar.outdir}thDC_{gvar.year}_{self.day:03d}.npy")
+        np.save(f"{gvar.outdir}thDC_{gvar.year}_{self.day:03d}.npy", th.value)
+        print(f"Writing {gvar.outdir}phDC_{gvar.year}_{self.day:03d}.npy")
+        np.save(f"{gvar.outdir}phDC_{gvar.year}_{self.day:03d}.npy", ph.value)
         return None
     # }}} save_theta_phi_DC(self)
 
@@ -319,17 +232,17 @@ class HmiClass():
     def save_theta_phi(self):
         lat = (self.lat + 90*u.deg).value
         lon = (self.lon).value
-        print(f"Writing {gvar.outdir}th_{self.year}_{self.day:03d}.npy")
-        np.save(f"{gvar.outdir}th_{self.year}_{self.day:03d}.npy", lat)
-        print(f"Writing {gvar.outdir}ph_{self.year}_{self.day:03d}.npy")
-        np.save(f"{gvar.outdir}ph_{self.year}_{self.day:03d}.npy", lon)
+        print(f"Writing {gvar.outdir}th_{gvar.year}_{self.day:03d}.npy")
+        np.save(f"{gvar.outdir}th_{gvar.year}_{self.day:03d}.npy", lat)
+        print(f"Writing {gvar.outdir}ph_{gvar.year}_{self.day:03d}.npy")
+        np.save(f"{gvar.outdir}ph_{gvar.year}_{self.day:03d}.npy", lon)
         return None
     # }}} save_theta_phi(self)
 
     # {{{ save_map_data(self)
     def save_map_data(self):
-        print(f"Writing {gvar.outdir}residual_{self.year}_{self.day:03d}.npy")
-        np.save(f"{gvar.outdir}residual_{self.year}_{self.day:03d}.npy",
+        print(f"Writing {gvar.outdir}residual_{gvar.year}_{self.day:03d}.npy")
+        np.save(f"{gvar.outdir}residual_{gvar.year}_{self.day:03d}.npy",
                 self.map_data)
         return None
     # }}} save_map_data(self)
@@ -353,7 +266,7 @@ class HmiClass():
     # }}} remove_grav_redshift(self)
 
     # {{{ def remove_sat_vel(self, method):
-    def remove_sat_vel(self, method):
+    def remove_sat_vel(self, method=2):
         self.get_sat_vel()
         if method == 1:
             # thetaHGC = self.HGF.lat.copy()  # + 90*u.deg
@@ -492,6 +405,7 @@ if __name__ == "__main__":
     # }}} dirs
 
     # 1. Reading HMI Dopplergrams
+    t1 = time.time()
     with open(hmi_data_fnames, mode="r") as f:
         hmi_files = f.read().splitlines()
 
@@ -501,13 +415,20 @@ if __name__ == "__main__":
 
     # 2. Creating SunPy maps
     for day in daylist:
+        print("### 1. Initializing")
         dop_img = HmiClass(hmi_data_dir, hmi_files[day], day)
+        print("### 2. Getting satellite velocity")
         dop_img.get_sat_vel()
+        print("### 3. Removing effect of satellite velocity")
         dop_img.remove_sat_vel()
+        print("### 4. Removing gravitational redshift")
         dop_img.remove_grav_redshift()
+        print("### 5. Removing large scale features")
         dop_img.remove_large_features()
+        print("### 6. Saving processed data")
 
         dop_img.save_theta_phi()
         dop_img.save_theta_phi_DC()
-        dop_img.save_processed_map()
-
+        dop_img.save_map_data()
+    t2 = time.time()
+    print(f"Total time taken = {(t2-t1)/60:5.2f} minutes")

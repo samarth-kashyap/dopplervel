@@ -21,6 +21,7 @@ class DopplerVars():
         self.hmidir = self.get_dir("hmidata")
         self.outdir = self.get_dir("output")
         self.plotdir = self.get_dir("plot")
+        self.year = "2018"
 
     def get_dir(self, dirname):
         """Returns directories used in the program
