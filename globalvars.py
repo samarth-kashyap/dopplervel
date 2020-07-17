@@ -2,23 +2,48 @@
 
 """
 
+
 class DopplerVars():
     """Class to handle all the global variables and 
     parameters
+
+    Methods:
+    --------
+    __init__ - initializes the object
+    get_dir  - gets directory path
 
     """
 
     def __init__(self):
         self.scratch = "/scratch/g.samarth"
+        self.seismo = "/scratch/seismogroup"
         self.home = "/home/g.samarth"
-        return None
+        self.hmidir = self.get_dir("hmidata")
+        self.outdir = self.get_dir("output")
+        self.plotdir = self.get_dir("plot")
 
     def get_dir(self, dirname):
-        if dirname == "hmidata":
-            return f"{self.scratch}/HMIDATA/v720s_dConS/2018/"
-        if dirname == "plot":
-            return f"{self.scratch}/plots/dopplervel/"
-        return None
+        """Returns directories used in the program
 
-# adding lines from iMac
-# adding line from cchpc
+        Parameters:
+        -----------
+        dirname - str
+            Selector for directories
+            possible values ("hmidata", "plot", "output")
+
+        Returns:
+        --------
+        directory - str
+            full path
+
+        """
+        if dirname == "hmidata":
+            directory = f"{self.seismo}/data/HMI/dopplergrams/"
+        elif dirname == "plot":
+            directory = f"{self.scratch}/plots/dopplervel/"
+        elif dirname == "output":
+            directory = f"{self.scratch}/HMIDATA/data_analysis/"
+        else:
+            print(f"dirname not recognized")
+            directory = None
+        return directory
