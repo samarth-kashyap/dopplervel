@@ -14,7 +14,7 @@ class DopplerVars():
 
     """
 
-    def __init__(self):
+    def __init__(self, day):
         self.scratch = "/scratch/g.samarth"
         self.seismo = "/scratch/seismogroup"
         self.home = "/home/g.samarth"
@@ -22,6 +22,10 @@ class DopplerVars():
         self.outdir = self.get_dir("output")
         self.plotdir = self.get_dir("plot")
         self.year = "2018"
+
+        # resolution of computation lmax = 3*nside - 1
+        self.nside = 512
+        self.day = day
 
     def get_dir(self, dirname):
         """Returns directories used in the program
@@ -45,6 +49,6 @@ class DopplerVars():
         elif dirname == "output":
             directory = f"{self.scratch}/HMIDATA/data_analysis/"
         else:
-            print(f"dirname not recognized")
+            print("dirname not recognized")
             directory = None
         return directory

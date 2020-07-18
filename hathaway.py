@@ -215,6 +215,7 @@ class HmiClass():
 
     # {{{ def save_theta_phi_DC(self):
     def save_theta_phi_DC(self):
+        """Saves coordinate of HMI map (ref: disc center)"""
         rho = np.sqrt(self.coords_hc_x**2 + self.coords_hc_y**2)
         psi = np.arctan2(self.coords_hc_y, self.coords_hc_x)
         ph = np.zeros(psi.shape) * u.rad
@@ -230,6 +231,7 @@ class HmiClass():
 
     # {{{ def save_theta_phi(self):
     def save_theta_phi(self):
+        """Saves the coordinates of HMI map"""
         lat = (self.lat + 90*u.deg).value
         lon = (self.lon).value
         print(f"Writing {gvar.outdir}th_{gvar.year}_{self.day:03d}.npy")
@@ -241,6 +243,7 @@ class HmiClass():
 
     # {{{ save_map_data(self)
     def save_map_data(self):
+        """Saves image data of HMI map"""
         print(f"Writing {gvar.outdir}residual_{gvar.year}_{self.day:03d}.npy")
         np.save(f"{gvar.outdir}residual_{gvar.year}_{self.day:03d}.npy",
                 self.map_data)

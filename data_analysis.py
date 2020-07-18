@@ -1,15 +1,15 @@
+# {{{ Library imports
 from scipy.spatial.transform import Rotation as R
-from astropy.io import fits
+from globalvars import DopplerVars
 from math import sqrt
-import pickle as pkl
 import healpy as hp
 import numpy as np
 import argparse
-import pickle
+import time
+# }}} imports
 
 
-NSIDE = 1024
-
+# {{{ Argument Parser
 parser = argparse.ArgumentParser()
 parser.add_argument('--hpc', help="Run program on hpc",
                     action="store_true")
@@ -20,18 +20,12 @@ parser.add_argument('--job', help="Submit as a job (PBS)",
 parser.add_argument('--gnup', help="Argument for gnuParallel",
                     type=int)
 args = parser.parse_args()
-
-if args.hpc:
-    home_dir = "/home/samarth/"
-    scratch_dir = "/scratch/samarth/"
-elif args.cchpc:
-    home_dir = "/home/g.samarth/"
-    scratch_dir = "/scratch/g.samarth/"
-else:
-    home_dir = "/home/samarthgk/hpchome/"
-    scratch_dir = "/home/samarthgk/hpcscratch/"
+gvar = DopplerVars(args.gnup)
+NSIDE = gvar.nside
+# }}} parser
 
 
+# {{{ def make_map(theta, phi, data, NSIDE):
 def make_map(theta, phi, data, NSIDE):
     """Makes healpy map given HMI image and coordinate data
 
@@ -45,6 +39,18 @@ def make_map(theta, phi, data, NSIDE):
         datapoints
     NSIDE - int
         the NSIDE parameter for healPix
+
+    Returns:
+    --------
+    (map, extmap, thmap, phmap)
+    map - healPy map
+        healPy map containing the signal
+    extmap - healPy mask
+        mask containing signal existance pixels
+    thmap - healPy map
+        coordinate theta - healPy map
+    phmap - healPy map
+        coorindate phi - healPy map
     """
     assert len(theta) == len(phi) == len(data)
     num_pix = hp.nside2npix(NSIDE)
@@ -64,8 +70,10 @@ def make_map(theta, phi, data, NSIDE):
         e1map[index] += k
         counts[index] += 1
     return e1map/counts, existance, theta_new, phi_new
+# }}} make_map(theta, phi, data, NSIDE)
 
 
+# {{{ def rotate_map_spin_eul(hmap, eulAngle):
 def rotate_map_spin_eul(hmap, eulAngle):
     """Take hmap (a healpix map array) and return another healpix map array
     which is ordered such that it has been rotated in (theta, phi) by the
@@ -117,8 +125,10 @@ def rotate_map_spin_eul(hmap, eulAngle):
         (vph*vth_rot).sum(axis=0) * rot_map1temp
 
     return rot_map0, rot_map1
+# }}} rotate_map_spin_eul(hmap, eulAngle)
 
 
+# {{{ def get_alm_ps(mapp):
 def get_alm_ps(mapp):
     """Get alms and the power spectrum
 
@@ -139,8 +149,10 @@ def get_alm_ps(mapp):
     powerSpec = hp.sphtfunc.anafast(mapp)
     ellArr = np.arange(len(powerSpec))
     return alm, powerSpec, ellArr
+# }}} get_alm_ps(mapp)
 
 
+# {{{ def restructure(ellArr, emmArr, lmax, coefs):
 def restructure(ellArr, emmArr, lmax, coefs):
     """Resturcture the alms in the convention followed by pyshtools
     ---------------------------------------------------------------
@@ -177,8 +189,10 @@ def restructure(ellArr, emmArr, lmax, coefs):
             new_coefs[count] = coefs[index]
             count += 1
     return new_coefs
+# }}} restructure(ellArr, emmArr, lmax, coefs)
 
 
+# {{{ def get_only_t(ellArr, emmArr, alm, lmax, t):
 def get_only_t(ellArr, emmArr, alm, lmax, t):
     """Filter out the values of alm for a given value of emm
 
@@ -207,8 +221,10 @@ def get_only_t(ellArr, emmArr, alm, lmax, t):
         alm_new[count] = alm[index]
         count += 1
     return alm_new
+# }}} get_only_t(ellArr, emmArr, alm, lmax, t)
 
 
+# {{{ def computePS(ellArr, emmArr, lmax, coefs):
 def computePS(ellArr, emmArr, lmax, coefs):
     """Computes the power spectrum
 
@@ -238,8 +254,10 @@ def computePS(ellArr, emmArr, lmax, coefs):
         index = np.where((ellArr == ell))[0]
         ps[ell] = (abs(coefs[index])**2).sum()*2  # / (2*ell+1)
     return ps
+# }}} computePS(ellArr, emmArr, lmax, coefs)
 
 
+# {{{ def tracking(alm, emmArr, ellArr, lmax, trate, time):
 def tracking(alm, emmArr, ellArr, lmax, trate, time):
     """Tracks the data with a given tracking rate.
 
@@ -276,8 +294,10 @@ def tracking(alm, emmArr, ellArr, lmax, trate, time):
         tomega = 1j * emm * trate
         alm2[index] *= np.exp(tomega)
     return alm2
+# }}} tracking(alm, emmArr, ellArr, lmax, trate, time)
 
 
+# {{{ def get_spin1_alms(map_r, map_trans):
 def get_spin1_alms(map_r, map_trans):
     """Get the vector spherical harmonic coefficients for spin1 harmonics.
 
@@ -303,8 +323,10 @@ def get_spin1_alms(map_r, map_trans):
     alm_v = -alm_pm[0]
     alm_w = -1j*alm_pm[1]
     return alm_r, alm_v, alm_w
+# }}} get_spin1_alms(map_r, map_trans)
 
 
+# {{{ def get_spin1_maps(dat_map, msk_map, th_map, ph_map, pole="diskCenter"):
 def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
     """Generates the spin0 and spin1 maps for a given image and coordinates.
 
@@ -355,64 +377,58 @@ def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
     map_trans[1][~mask_map] = 0.0
 
     return map_r, map_trans
+# }}} get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter")
 
 
 if __name__ == "__main__":
-    data_dir = scratch_dir + "HMIDATA/data_analysis/"
-    working_dir = scratch_dir + "HMIDATA/v720s_dConS/2018/"
+    rw_dir = gvar.outdir
     # suffix convention
     # 1 - used for coordinates where pole is at solar north pole
     # 2 - used for coordinates where pole is at disk center
-    use_fits = False
-    use_pkl = False
-    days = args.gnup if args.gnup else 0
-    if use_fits:
-        data = fits.open("residual.fits", memmemmap=False)[0].data.flatten()
-        phi2 = fits.open("phiRot.fits", memmemmap=False)[0].data.flatten()
-        theta2 = fits.open("thetaRot.fits", memmap=False)[0].data.flatten()
-    else:
-        if use_pkl:
-            data = pkl.load(open(working_dir + "residual"
-                                 + str(days).zfill(3)
-                                 + ".pkl", "rb")).flatten()
-        else:
-            data = np.load(working_dir + "residual" + str(days).zfill(3) +
-                           ".pkl.npy").flatten()
-        phi2 = pkl.load(open(working_dir + "phiRot" + str(days).zfill(3) +
-                             ".pkl", "rb")).flatten()
-        theta2 = pkl.load(open(working_dir + "thetaRot" + str(days).zfill(3) +
-                               ".pkl", "rb")).flatten()
-    radial = fits.open(working_dir + "radialGrid.fits",
-                       memmemmap=False)[0].data.flatten()
+    t1 = time.time()
+    dt2 = np.load(f"{gvar.outdir}residual_{gvar.year}_{gvar.day:03d}.npy")
+    ph2 = np.load(f"{gvar.outdir}phDC_{gvar.year}_{gvar.day:03d}.npy")
+    th2 = np.load(f"{gvar.outdir}thDC_{gvar.year}_{gvar.day:03d}.npy")
+    t2 = time.time()
+    print(f"Time taken for loading files = {(t2-t1)/60:5.2f} min")
+
+#    radial = fits.open(working_dir + "radialGrid.fits",
+#                       memmemmap=False)[0].data.flatten()
 #    apod = np.exp( - radial**2/2/0.5**2)
 #    apodize = 1/( 1 + np.exp(75*(radial - 0.95)))
-    apodize = np.ones_like(radial)
-    datamask = ~np.isnan(data)
+    apdz = np.ones_like(dt2)
+    dt2mask = ~np.isnan(dt2)
 
     # masking data, theta, phi
-    phi2 = phi2[datamask]
-    theta2 = theta2[datamask]
-    data = data[datamask]
-    apodize = apodize[datamask]
+    ph2 = ph2[dt2mask]
+    th2 = th2[dt2mask]
+    dt2 = dt2[dt2mask]
+    apdz = apdz[dt2mask]
 
     # creating healPy maps (including apodization)
-    data2map, mask2map, theta2map, phi2map = make_map(theta2, phi2,
-                                                      data*apodize, NSIDE)
+    t1 = time.time()
+    dt2map, mask2map, th2map, ph2map = make_map(th2, ph2, dt2*apdz, NSIDE)
+    t2 = time.time()
+    print(f"Time taken for making maps = {(t2-t1)/60:5.2f} min")
     # all coordinates and maps have been converted to healPy maps
     # deleting the temporary variables
-    del apodize, theta2, phi2, radial, datamask
+    del apdz, th2, ph2, dt2mask
 
-    map2r, map2trans = get_spin1_maps(data2map, mask2map,
-                                      theta2map, phi2map, pole="diskCenter")
+    map2r, map2trans = get_spin1_maps(dt2map, mask2map,
+                                      th2map, ph2map, pole="diskCenter")
     alm2r, alm2v, alm2w = get_spin1_alms(map2r, map2trans)
     ellmax = hp.sphtfunc.Alm.getlmax(len(alm2r))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
-    np.savez_compressed(data_dir + "ulm"+str(days).zfill(3)+".txt.npz",
-                        ulm=alm2r)
-    np.savez_compressed(data_dir + "vlm"+str(days).zfill(3)+".txt.npz",
-                        vlm=alm2v)
-    np.savez_compressed(data_dir + "wlm"+str(days).zfill(3)+".txt.npz",
-                        wlm=alm2w)
+
+    np.save(f"{rw_dir}ulm{gvar.day:03d}.npy", alm2r)
+    np.save(f"{rw_dir}vlm{gvar.day:03d}.npy", alm2v)
+    np.save(f"{rw_dir}wlm{gvar.day:03d}.npy", alm2w)
+#    np.savez_compressed(data_dir + "ulm"+str(days).zfill(3)+".txt.npz",
+#                        ulm=alm2r)
+#    np.savez_compressed(data_dir + "vlm"+str(days).zfill(3)+".txt.npz",
+#                        vlm=alm2v)
+#    np.savez_compressed(data_dir + "wlm"+str(days).zfill(3)+".txt.npz",
+#                        wlm=alm2w)
 #    np.savez_compressed(data_dir + "ellArr.txt.npz", ellArr=ellArr)
 #    np.savez_compressed(data_dir + "emmArr.txt.npz", emmArr=emmArr)
 
