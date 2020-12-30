@@ -23,7 +23,7 @@ parser.add_argument('--gnup', help="Argument for gnuParallel",
                     type=int)
 args = parser.parse_args()
 
-gvar = DopplerVars()
+gvar = DopplerVars(args.gnup)
 # }}} argument parser
 
 

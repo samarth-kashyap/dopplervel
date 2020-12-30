@@ -13,6 +13,8 @@ parser.add_argument('--hpc', help="Run program on daahpc",
                     action="store_true")
 parser.add_argument('--cchpc', help="Run program on cchpc19",
                     action="store_true")
+parser.add_argument('--datatype', help="\'LCT\' or \'doppler\'",
+                    type=str)
 args = parser.parse_args()
 
 if args.hpc:
@@ -26,12 +28,18 @@ else:
     scratch_dir = "/home/samarthgk/cchpcscratch/"
 # }}} parser
 
-data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
-NTIME = 300
+datatype = args.datatype
+
+if datatype == 'doppler':
+    data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
+elif datatype == 'LCT':
+    data_dir = "/scratch/g.samarth/HMIDATA/LCT/"
+
+NTIME = 2 #300
 
 
 # {{{ def load_time_series(NTIME, data_dir):
-def load_time_series(NTIME, data_dir):
+def load_time_series(NTIME, data_dir, datatype='doppler'):
     '''Loads time series of alms by reading alms of each image.
 
     Parameters:
@@ -58,8 +66,11 @@ def load_time_series(NTIME, data_dir):
     '''
     count = 0
     for i in range(NTIME):
-        suffix = str(i).zfill(3) + ".npz"
-        fname = data_dir + "alm.data.inv.final" + suffix
+        if datatype == 'doppler':
+            suffix = str(i).zfill(3) + ".npz"
+            fname = data_dir + "alm.data.inv.final" + suffix
+        elif datatype == 'LCT':
+            fname = f"almo_2011_{i:03d}.npz"
         try:
             alm = np.load(fname)
             alm_found = True
@@ -68,27 +79,35 @@ def load_time_series(NTIME, data_dir):
             alm_found = False
             pass
         if count==0 and alm_found:
-            ulm = alm['ulm']
+            if datatype == 'doppler':
+                ulm = alm['ulm']
             vlm = alm['vlm']
             wlm = alm['wlm']
-            lmax = alm['ellmax']
+            # lmax = alm['ellmax']
 
-            ulen = len(ulm)
-            utime = np.zeros((ulen, NTIME), dtype=complex)
+            ulen = len(vlm)
+            if datatype == 'doppler':
+                utime = np.zeros((ulen, NTIME), dtype=complex)
             vtime = np.zeros((ulen, NTIME), dtype=complex)
             wtime = np.zeros((ulen, NTIME), dtype=complex)
-            utime[:, 0] = ulm
+
+            if datatype == 'doppler':
+                utime[:, 0] = ulm
             vtime[:, 0] = vlm
             wtime[:, 0] = wlm
             print(f" i = {i} ")
             count += 1
         elif count>0 and alm_found:
-            utime[:, i] = alm['ulm']
+            if datatype == 'doppler':
+                utime[:, i] = alm['ulm']
             vtime[:, i] = alm['vlm']
             wtime[:, i] = alm['wlm']
             if i%10==0:
                 print(f" i = {i} ")
-    return utime, vtime, wtime
+    if datatype == 'doppler':
+        return utime, vtime, wtime
+    elif datatype == 'LCT':
+        return vtime, wtime
 # }}} load_time_series(NTIME, data_dir)
 
 
@@ -198,7 +217,7 @@ def plot_all(ust, vst, wst, lmin, lmax):
 
     plt.figure(figsize=(10, 10))
 #    plt.rcParams.update({'font.size': 20})
-    plt.rc("text", usetex=True)
+    # plt.rc("text", usetex=True)
     plt.rc("font", family="serif", size="20")
     plt.title(" Total power summed over $s_{min}$ =" + f" {lmin}," +"$s_{max}$ = " + f"{lmax}")
     plt.semilogy(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
@@ -207,14 +226,14 @@ def plot_all(ust, vst, wst, lmin, lmax):
     plt.xlabel("$s - |t|$")
     plt.ylabel("Total Power in ms$^{-1}$")
     plt.legend()
-    plot_fname = data_dir + "st_log_"+str(lmin)+"_"+str(lmax)+".png"
+    plot_fname = data_dir + "st_log_"+str(lmin)+"_"+str(lmax)+".pdf"
     print(f"Saving plot to {plot_fname}")
     plt.savefig(plot_fname)
     plt.close()
 
     plt.figure(figsize=(10, 10))
 #    plt.rcParams.update({'font.size': 20})
-    plt.rc("text", usetex=True)
+    # plt.rc("text", usetex=True)
     plt.rc("font", family="serif", size="20")
     plt.title(" Total power summed over $s_{min}$ =" + f" {lmin}," +"$s_{max}$ = " + f"{lmax}")
     plt.plot(xst, ust.sum(axis=1)/NTIME, 'g', label='radial')
@@ -223,7 +242,7 @@ def plot_all(ust, vst, wst, lmin, lmax):
     plt.xlabel("$s - |t|$")
     plt.ylabel("Total Power in ms$^{-1}$")
     plt.legend()
-    plot_fname = data_dir + "st_"+str(lmin)+"_"+str(lmax)+".png"
+    plot_fname = data_dir + "st_"+str(lmin)+"_"+str(lmax)+".pdf"
     print(f"Saving plot to {plot_fname}")
     plt.savefig(plot_fname)
     plt.close()
@@ -286,17 +305,11 @@ if __name__=="__main__":
     freq_arr = np.fft.fftfreq(time_arr.shape[0], dtime)
     dfreq = freq_arr[1] - freq_arr[0]
 
-    utime, vtime, wtime = load_time_series(NTIME, data_dir)
+    utime, vtime, wtime = load_time_series(NTIME, data_dir,
+                                           datatype=args.datatype)
     length_alm = utime.shape[0]
     lmax = hp.sphtfunc.Alm.getlmax(length_alm)
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(lmax)
-    cio.writefitsfile(utime.real, data_dir + "utime1.fits")
-    cio.writefitsfile(utime.imag, data_dir + "utime2.fits")
-    cio.writefitsfile(vtime.real, data_dir + "vtime1.fits")
-    cio.writefitsfile(vtime.imag, data_dir + "vtime2.fits")
-    cio.writefitsfile(wtime.real, data_dir + "wtime1.fits")
-    cio.writefitsfile(wtime.imag, data_dir + "wtime2.fits")
-
     """
     ufreq = np.fft.fft(utime, axis=1, norm="ortho")
     vfreq = np.fft.fft(vtime, axis=1, norm="ortho")
@@ -316,8 +329,8 @@ if __name__=="__main__":
     plt.show()
     """
 
-#    block_size = 100
-#    analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
+    block_size = 50
+    analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
 
     ##  ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, 0, 50)
     ##  plot_all(ust, vst, wst, 0, 50)

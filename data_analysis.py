@@ -368,9 +368,12 @@ def get_spin1_maps(data_map, mask_map, theta_map, phi_map, pole="diskCenter"):
 
     # Finding the vector spherical harmonic coefficients
     map_r = data_map * losr
-    map_p = - data_map * (lost + 1j*losp) / sqrt(2)
-    map_m = - data_map * (lost - 1j*losp) / sqrt(2)
-    map_trans = [(map_p + map_m)/2, -1j*(map_p - map_m)/2]
+    map_th = data_map * lost / sqrt(2)
+    map_ph = data_map * losp / sqrt(2)
+    map_trans = [-map_th, -map_ph]
+    # map_p = - data_map * (lost + 1j*losp) / sqrt(2)
+    # map_m = - data_map * (lost - 1j*losp) / sqrt(2)
+    # map_trans = [(map_p + map_m)/2, -1j*(map_p - map_m)/2]
 
     map_r[~mask_map] = hp.UNSEEN
     map_trans[0][~mask_map] = 0.0
@@ -420,9 +423,9 @@ if __name__ == "__main__":
     ellmax = hp.sphtfunc.Alm.getlmax(len(alm2r))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
 
-    np.save(f"{rw_dir}ulm{gvar.day:03d}.npy", alm2r)
-    np.save(f"{rw_dir}vlm{gvar.day:03d}.npy", alm2v)
-    np.save(f"{rw_dir}wlm{gvar.day:03d}.npy", alm2w)
+    np.save(f"{rw_dir}/ulm{gvar.day:03d}.npy", alm2r)
+    np.save(f"{rw_dir}/vlm{gvar.day:03d}.npy", alm2v)
+    np.save(f"{rw_dir}/wlm{gvar.day:03d}.npy", alm2w)
 #    np.savez_compressed(data_dir + "ulm"+str(days).zfill(3)+".txt.npz",
 #                        ulm=alm2r)
 #    np.savez_compressed(data_dir + "vlm"+str(days).zfill(3)+".txt.npz",
