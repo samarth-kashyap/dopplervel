@@ -5,6 +5,7 @@ from scipy.integrate import simps          # Integration - simpsons
 import matplotlib.pyplot as plt            # Plotting
 from math import sqrt, pi                  # Math constants
 import numpy as np
+import healpy as hp
 import argparse
 import time
 # }}} imports
@@ -890,9 +891,9 @@ if __name__ == "__main__":
             wlmAth = np.load(magneto_dir + "wlmA.magnetogram.npz")['wlm']
         else:
             # synthetic data has both true and observed alms
-            arrFile = np.load("arrlm.npz")# contains arrays of ell and emm
-            almFile = np.load("alm.npz")  # contains arrays of alms - observed
-            almAFile = np.load("almA.npz")# contains arrays of alms - theoretical
+            arrFile = np.load("/scratch/g.samarth/HMIDATA/synth/arrlm.npz")# contains arrays of ell and emm
+            almFile = np.load("/scratch/g.samarth/HMIDATA/synth/alm.npz")  # contains arrays of alms - observed
+            almAFile = np.load("/scratch/g.samarth/HMIDATA/synth/almA.npz")# contains arrays of alms - theoretical
             # loading ell and emm arrays
             ellArr = arrFile['ellArr']
             emmArr = arrFile['emmArr']
@@ -906,16 +907,21 @@ if __name__ == "__main__":
             wlmAth = almAFile['wlm']
     else:
         # real data has only observed alms
-        ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
-        emmArr = np.load(data_dir_read + "emmArr.txt.npz")['emmArr']
+        # ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
+        # emmArr = np.load(data_dir_read + "emmArr.txt.npz")['emmArr']
+        ellArr, emmArr = hp.sphtfunc.Alm.getlm(1535)
         # loading alms - observed
         if args.gnup:
-            suffix = str(args.gnup).zfill(3) + ".txt.npz"
+            # suffix = str(args.gnup).zfill(3) + ".txt.npz"
+            suffix = str(args.gnup).zfill(3) + ".npy"
+            ulmo = np.load(data_dir_read + "ulm" + suffix)
+            vlmo = np.load(data_dir_read + "vlm" + suffix)
+            wlmo = np.load(data_dir_read + "wlm" + suffix)
         else:
             suffix = ".txt.npz"
-        ulmo = np.load(data_dir_read + "ulm" + suffix)['ulm']
-        vlmo = np.load(data_dir_read + "vlm" + suffix)['vlm']
-        wlmo = np.load(data_dir_read + "wlm" + suffix)['wlm']
+            ulmo = np.load(data_dir_read + "ulm" + suffix)['ulm']
+            vlmo = np.load(data_dir_read + "vlm" + suffix)['vlm']
+            wlmo = np.load(data_dir_read + "wlm" + suffix)['wlm']
 
     print("loading files -- complete")
 
@@ -1001,7 +1007,7 @@ if __name__ == "__main__":
             if args.gnup:
                 suffix = f"magneto.{args.gnup:02d}.npz"
             else:
-                suffix = f"magneto.npz"
+                suffix = "magneto.npz"
         else:
             suffix = ".npz"
         fname = data_dir + "alm.syn.inv." + suffix
@@ -1033,8 +1039,9 @@ if __name__ == "__main__":
         fig = plot_inv_actual((psu, psv, psw),
                               (psuth, psvth, pswth),
                               ell, args)
-        fig.savefig(fname + ".png")
-        plt.close(fig)
+#        fig.savefig(fname + ".png")
+        plt.show(fig)
+#        plt.close(fig)
     else:
         plt.figure()
         plt.loglog(psu, 'g', label='radial')

@@ -16,6 +16,8 @@ parser.add_argument('--gnup', help="Argument for GNU Parallel",
                     type=int)
 args = parser.parse_args()
 gvar = DopplerVars(args.gnup)
+scratch_dir = gvar.scratch
+home_dir = gvar.home
 # }}} parser
 
 
@@ -246,10 +248,10 @@ def alm4nside(ulm, vlm, wlm, ellArr, emmArr, nside):
 
 
 if __name__=="__main__":
-    workingDir = scratch_dir + "matrixA/"
-    data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
-    data_dir_read = scratch_dir + "HMIDATA/data_analysis/"
-    th_dir = home_dir + "dopplervel2/"
+    workingDir = f"{scratch_dir}/matrixA/"
+    data_dir = f"{scratch_dir}/HMIDATA/data_analysis/lmax1535/"
+    data_dir_read = f"{scratch_dir}/HMIDATA/data_analysis/"
+    th_dir = f"/scratch/g.samarth/dopplervel/datafiles/"
     if args.gnup:
         suffix = str(args.gnup).zfill(3) + ".npz"
     else:
@@ -258,12 +260,13 @@ if __name__=="__main__":
     alm = np.load(fname)
     ellArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
     emmArr = np.load(data_dir_read + "ellArr.txt.npz")['ellArr']
+    ellArr, emmArr = hp.sphtfunc.Alm.getlm(1535)
     ulm2 = alm['ulm']
     vlm2 = alm['vlm']
     wlm2 = alm['wlm']
 
     lmax_calc = 1535
-    NSIDE = 1024
+    NSIDE = gvar.nside
     LMAXHP = 3*NSIDE - 1
     SPIN = 1
 #    ellArr, emmArr = get_ell_emm_arr(LMAXHP)
@@ -291,14 +294,15 @@ if __name__=="__main__":
     ulm1, vlm1, wlm1 = get_spin1_alms(map1r, map1trans)
     ellmax = hp.sphtfunc.Alm.getlmax(len(vlm1))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
-    fname = data_dir + "alm.data.inv.final" + suffix
+    fname = data_dir + "alm.data.inv.final_test" + suffix
     np.savez_compressed(fname, ulm=ulm1, vlm=vlm1, wlm=wlm1,
                         NSIDE=NSIDE, ellmax=ellmax)
 
+    """
     upow = computePS(ellArr, emmArr, ellmax, ulm1)
     vpow = computePS(ellArr, emmArr, ellmax, vlm1)
     wpow = computePS(ellArr, emmArr, ellmax, wlm1)
-    np.savez_compressed(data_dir+"power.final"+suffix, upow=upow,
+    np.savez_compressed(data_dir+"power.final_test"+suffix, upow=upow,
                         vpow=vpow, wpow=wpow)
     _max_plot = len(upow)
 
@@ -309,12 +313,13 @@ if __name__=="__main__":
     fac = 2.8
     plt.rcParams.update({'font.size': 15})
     plt.figure(figsize=(20, 10))
-    plt.loglog(uth[:, 0], uth[:, 1],'g', label='radial')
-    plt.loglog(vth[:, 0], vth[:, 1],'r', label='poloidal')
-    plt.loglog(wth[:, 0], wth[:, 1],'b', label='toroidal')
+    plt.loglog(uth[:, 0], uth[:, 1], 'g', label='radial')
+    plt.loglog(vth[:, 0], vth[:, 1], 'r', label='poloidal')
+    plt.loglog(wth[:, 0], wth[:, 1], 'b', label='toroidal')
     plt.loglog(fac*upow[:lmax_calc], '--g')
     plt.loglog(fac*vpow[:lmax_calc], '--r')
     plt.loglog(fac*wpow[:lmax_calc], '--b')
     plt.legend()
     plt.savefig(data_dir + "ps"+suffix+".png")
     plt.show()
+    """

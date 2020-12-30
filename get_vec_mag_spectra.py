@@ -9,9 +9,15 @@ from math import pi, sqrt
 import astropy.units as u
 from sunpy.coordinates import frames
 from sunpy.net import Fido, attrs as a
+import argparse
 # }}} imports
 
 NSIDE = 512
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--gnup', help="GNUP parameter",
+                    type=int)
+args = parser.parse_args()
 
 
 # {{{ def loadfits_compressed(fname):
@@ -112,7 +118,6 @@ def create_rot_mat(theta, phi):
     [x, y, z] - x corresponds to pixel number
                 y, z correspond to the rotation matrix index (0, 1, 2)
     """
-    masknan = ~np.isnan(theta)
     theta = theta[masknan].copy()
     phi = phi[masknan].copy()
     rotmat = np.zeros((len(phi), 3, 3), dtype=float)
@@ -178,13 +183,22 @@ def get_sph_from_cart(bx, by, bz, rotmat):
     bt_flat = br[masknan]
     bp_flat = br[masknan]
 
-    for i in range(len(bz_flat)):
-        bvec = np.array([bx_flat[i], by_flat[i], bz_flat[i]])
-        (br_flat[i], bt_flat[i], bp_flat[i]) = bvec.dot(rotmat[i, :, :])
+    print(f" {len(bz_flat)}; rotmat = {rotmat.shape[0]}")
+    bvec = np.zeros((len(bz_flat), 3, 1))
+    brvec = np.zeros((len(bz_flat), 3, 1))
+    bvec[:, 0, 0], bvec[:, 1, 0], bvec[:, 2, 0] = bx_flat, by_flat, bz_flat
+    brvec = rotmat @ bvec
 
-    br[masknan] = br_flat
-    bt[masknan] = bt_flat
-    bp[masknan] = bp_flat
+    br[masknan] = brvec[:, 0, 0] #br_flat
+    bt[masknan] = brvec[:, 1, 0] #bt_flat
+    bp[masknan] = brvec[:, 2, 0] #bp_flat
+
+#    for i in range(len(bz_flat)):
+#        bvec = np.array([bx_flat[i], by_flat[i], bz_flat[i]])
+#        (br_flat[i], bt_flat[i], bp_flat[i]) = bvec.dot(rotmat[i, :, :])
+#    br[masknan] = br_flat
+#    bt[masknan] = bt_flat
+#    bp[masknan] = bp_flat
     return br, bt, bp
 # }}} get_sph_from_cart(bx, by, bz, rotmat)
 
@@ -220,7 +234,7 @@ def get_vec_polar(b, inc, azi, theta, phi):
 
 
 # {{{ def get_map_coords(hmi_map):
-def get_map_coords(hmi_map):
+def get_map_coords():
     # Getting the B0 and P0 angles
     # B0 = hmi_map.observer_coordinate.lat
     # P0 = hmi_map.observer_coordinate.lon
@@ -233,6 +247,7 @@ def get_map_coords(hmi_map):
     # r[mask_r] = np.nan
 
     # getting the coordinate data
+    hmi_map = sunpy.map.Map(data_dir + vec_prefix + "field.fits")
     x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
         * u.pix
     hpc_coords = hmi_map.pixel_to_world(x, y)
@@ -244,7 +259,7 @@ def get_map_coords(hmi_map):
     rho = np.sqrt(x**2 + y**2)
     psi = np.arctan2(y, x)
 
-    # heliocentric polar to spherical coordinates (pole @ disk center)
+
     phi = np.zeros(psi.shape) * u.rad
     phi[psi < 0] = psi[psi < 0] + 2*pi * u.rad
     phi[~(psi < 0)] = psi[~(psi < 0)]
@@ -252,6 +267,23 @@ def get_map_coords(hmi_map):
 
     return theta, phi
 # }}} get_map_coords(hmi_map)
+
+
+# {{{ def get_map_coords_HG():
+def get_map_coords_HG():
+    hmi_map = sunpy.map.Map(data_dir + vec_prefix + "field.fits")
+    x, y = np.meshgrid(*[np.arange(v.value) for v in hmi_map.dimensions])\
+        * u.pix
+    hpc_coords = hmi_map.pixel_to_world(x, y)
+    hpc_hg = hpc_coords.transform_to(frames.HeliographicStonyhurst)
+
+    lat, lon = hpc_hg.lat, hpc_hg.lon
+    lon += 180*u.deg
+    lat += 90*u.deg
+
+    masknan = ~np.isnan(hmi_map.data)
+    return lat.value*np.pi/180, lon.value*np.pi/180, masknan
+# }}} get_map_coords_HG()
 
 
 # {{{ def get_jsoc_map(start_time, end_time, series_name, email_notify):
@@ -384,8 +416,8 @@ def make_healpy_maps(theta, phi, br, NSIDE, losmap=True, bt=0, bp=0):
     if not losmap:
         bt = bt[masknan].copy()
         bp = bp[masknan].copy()
-    theta = (theta[masknan].value).copy()
-    phi = (phi[masknan].value).copy()
+    theta = (theta[masknan]).copy()
+    phi = (phi[masknan]).copy()
 
     if losmap:
         assert len(theta) == len(phi) == len(br)
@@ -512,12 +544,32 @@ def get_spin1_alms(map_r, map_trans):
 # }}} get_spin1_alms(map_r, map_trans)
 
 
+# {{{ def load_sunpy_map():
+def load_sunpy_map_old():
+    a = fits.open(data_dir + vec_prefix + "field.fits")
+    ref = fits.open("/scratch/seismogroup/data/HMI/magnetograms/" +
+                    "hmi.ME_720s_fd10.20200501_000000_TAI.field.fits")
+    a.verify("fix")
+    ref.verify("fix")
+    data, header = a[1].data, a[1].header
+    data = a[1].data
+    refhead = ref[1].header
+    header['cunit1'] = 'arcsec'
+    header['cunit2'] = 'arcsec'
+    obsdt = f"{args.gnup}"
+    header['telescop'] = refhead['telescop']
+    header['date-obs'] = f"{obsdt[:4]}-{obsdt[4:6]}-{obsdt[6:]}T00:00:00.00"
+    header['T_OBS'] = f"{obsdt[:4]}.{obsdt[4:6]}.{obsdt[6:]}_00:00:00_TAI"
+    hmi_map = sunpy.map.Map(data, refhead)
+    return hmi_map
+# }}} load_sunpy_map()
+
+
 if __name__ == "__main__":
     # {{{ loading files
     data_dir = "/scratch/seismogroup/data/HMI/magnetograms/"
     write_dir = "/scratch/g.samarth/HMIDATA/magnetogram/"
-    vec_prefix = "hmi.ME_720s_fd10.20200501_000000_TAI."
-    los_prefix = "hmi.M_720s.20200501_000000_TAI.3."
+    vec_prefix = f"hmi.ME_720s_fd10.{args.gnup}_000000_TAI."
     # b_los = loadfits_compressed(data_dir + los_prefix + "magnetogram.fits")
     # }}} loading files
 
@@ -525,25 +577,15 @@ if __name__ == "__main__":
     b_azimuth = loadfits_compressed(data_dir + vec_prefix + "azimuth.fits")
     b_inclination = loadfits_compressed(data_dir + vec_prefix +
                                         "inclination.fits")
-    hmi_map = sunpy.map.Map(data_dir + vec_prefix + "field.fits")
 
-    blos = b_magnitude * np.cos(b_inclination)
+    theta, phi, masknan = get_map_coords_HG()
+
     bx, by, bz = get_vec_cartesian(b_magnitude, b_inclination, b_azimuth)
-    theta, phi = get_map_coords(hmi_map)
+    del b_magnitude, b_inclination, b_azimuth
     rot_mat = create_rot_mat(theta, phi)
     br, bt, bp = get_sph_from_cart(bx, by, bz, rot_mat)
+    del bx, by, bz
 
-    print("Making LOS maps healPy")
-    t1 = time.time()
-    vec_map_op = make_healpy_maps(theta, phi, br, NSIDE)
-    r_map, mask_map, theta_map, phi_map = vec_map_op
-    map1r, map1trans = get_spin1_maps(r_map, mask_map, theta_map, phi_map)
-    alm1r, alm1v, alm1w = get_spin1_alms(map1r, map1trans)
-    t2 = time.time()
-    print(f"Time taken to make LOS map = {(t2-t1)/60:.2f} minutes")
-
-    print(" ")
-    print("Making vector maps healPy")
     t1 = time.time()
     vec_map_op = make_healpy_maps(theta, phi, br, NSIDE,
                                   losmap=False, bt=bt, bp=bp)
@@ -554,10 +596,7 @@ if __name__ == "__main__":
     ellmax = hp.sphtfunc.Alm.getlmax(len(alm2r))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
     t2 = time.time()
-    np.savez_compressed(write_dir + "ulmA.magnetogram.npz", ulm=alm2r)
-    np.savez_compressed(write_dir + "ulmo.magnetogram.npz", ulm=alm1r)
-    np.savez_compressed(write_dir + "vlmA.magnetogram.npz", vlm=alm2v)
-    np.savez_compressed(write_dir + "vlmo.magnetogram.npz", vlm=alm1v)
-    np.savez_compressed(write_dir + "wlmA.magnetogram.npz", wlm=alm2w)
-    np.savez_compressed(write_dir + "wlmo.magnetogram.npz", wlm=alm1w)
+    np.save(write_dir + f"BrlmA.{args.gnup}.npy", alm2r)
+    np.save(write_dir + f"BplmA.{args.gnup}.npy", alm2v)
+    np.save(write_dir + f"BtlmA.{args.gnup}.npy", alm2w)
     print(f"Time taken to make vector maps = {(t2-t1)/60:.2f} minutes")
