@@ -9,7 +9,9 @@ import healpy as hp
 import argparse
 import time
 # }}} imports
-
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
 
 # {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
@@ -791,41 +793,39 @@ def plot_inv_actual(inv, act, ell, args):
         title_suffix = "velocity"
     inv_total = np.sqrt(inv[0]**2 + inv[1]**2 + inv[2]**2)
     act_total = np.sqrt(act[0]**2 + act[1]**2 + act[2]**2)
-    fig = plt.figure(figsize=(10, 10))
-    plt.rcParams.update({'font.size': 15})
-    plt.subplot(221)
-    plt.title(f"Radial {title_suffix}")
-    plt.loglog(np.sqrt(ell * inv[0]), 'g-.', label='inverted')
-    plt.loglog(np.sqrt(ell * act[0]), 'g', label='actual')
-    plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel(yaxis_label)
-    plt.legend()
+    fig, axs = plt.subplots(figsize=(12, 4), nrows=1, ncols=3)
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.08)
+    # fig.suptitle(title_str, fontsize=26, y=1.0, x=0.52)
+    plt.rcParams.update({'font.size': 16})
+    fig.text(0.55, 0.01, " Azimuthal degree $t$ ", ha='center') #, fontsize=26)
+    fig.text(0.01, 0.50, 'Velocity \n (m/s)', va='center',
+             rotation='horizontal') #, fontsize=26)
+    axs.flatten()[0].set_title(f"Radial {title_suffix}", fontsize=14)
+    axs.flatten()[0].loglog(np.sqrt(ell * inv[0]), 'r', label='inverted')
+    axs.flatten()[0].loglog(np.sqrt(ell * act[0]), 'k', label='actual')
 
-    plt.subplot(222)
-    plt.title(f"Poloidal {title_suffix}")
-    plt.loglog(np.sqrt(ell * inv[1]), 'r-.', label='inverted')
-    plt.loglog(np.sqrt(ell * act[1]), 'r', label='actual')
-    plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel(yaxis_label)
-    plt.legend()
+    axs.flatten()[1].set_title(f"Poloidal {title_suffix}", fontsize=14)
+    axs.flatten()[1].loglog(np.sqrt(ell * inv[1]), 'r', label='inverted')
+    axs.flatten()[1].loglog(np.sqrt(ell * act[1]), 'k', label='actual')
 
-    plt.subplot(223)
-    plt.title(f"Toroidal {title_suffix}")
-    plt.loglog(np.sqrt(ell * inv[2]), 'b-.', label='inverted')
-    plt.loglog(np.sqrt(ell * act[2]), 'b', label='actual')
-    plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel(yaxis_label)
-    plt.legend()
+    axs.flatten()[2].set_title(f"Toroidal {title_suffix}", fontsize=14)
+    axs.flatten()[2].loglog(np.sqrt(ell * inv[2]), 'r', label='inverted')
+    axs.flatten()[2].loglog(np.sqrt(ell * act[2]), 'k', label='actual')
 
-    plt.subplot(224)
-    plt.title(f"Total {title_suffix}")
-    plt.loglog(np.sqrt(ell * inv_total), color='black',
-               linestyle='-.', label='inverted')
-    plt.loglog(np.sqrt(ell * act_total), 'black', label='actual')
-    plt.xlabel("Spherical harmonic degree $l$")
-    plt.ylabel(yaxis_label)
-    plt.legend()
-    plt.tight_layout()
+    for i in range(3):
+        axs.flatten()[i].tick_params(axis='both', which='major', labelsize=14)
+        axs.flatten()[i].tick_params(axis='both', which='minor', labelsize=14)
+    fig.tight_layout(rect=[0.08, 0.1, 1.0, 0.9])
+
+    # plt.subplot(224)
+    # plt.title(f"Total {title_suffix}")
+    # plt.loglog(np.sqrt(ell * inv_total), color='black',
+    #            linestyle='-.', label='inverted')
+    # plt.loglog(np.sqrt(ell * act_total), 'black', label='actual')
+    # plt.xlabel("Spherical harmonic degree $l$")
+    # plt.ylabel(yaxis_label)
+    # plt.legend()
+    # plt.tight_layout()
     return fig
 # }}} plot_inv_actual(inv, act, ell, args)
 
@@ -1041,6 +1041,7 @@ if __name__ == "__main__":
                               ell, args)
 #        fig.savefig(fname + ".png")
         plt.show(fig)
+        fig.savefig('/scratch/g.samarth/plots/synth/solarlike.pdf')
 #        plt.close(fig)
     else:
         plt.figure()

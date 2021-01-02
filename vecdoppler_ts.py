@@ -7,6 +7,7 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
 LMAX = 375
+# LMAX = 1500
 
 def get_title(comp, var_not_summed='sigma'):
     if comp==0:
@@ -32,6 +33,31 @@ def get_title(comp, var_not_summed='sigma'):
             title_str = " $\\sqrt{\sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  s(s+1)|w_{st}(\sigma)|^2}$ "
     return title_str
 
+def get_title_new(comp, var_not_summed='sigma'):
+    if comp==0:
+        if var_not_summed == 'sigma':
+            title_str = " $\\left( {\sum\limits_{s, t} |u_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 't':
+            title_str = " $\\left( \sum\limits_{s, \sigma} |u_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 's-|t|':
+            title_str = " $\\left( \sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  |u_{st}(\sigma)|^2 \\right)^{1/2}$ s $\in$ "
+    elif comp==1:
+        if var_not_summed == 'sigma':
+            title_str = " $\\left( \sum\limits_{s, t} s(s+1)|v_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 't':
+            title_str = " $\\left( \sum\limits_{s, \sigma} s(s+1)|v_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 's-|t|':
+            title_str = " $\\left( \sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  s(s+1)|v_{st}(\sigma)|^2 \\right)^{1/2}$ "
+    elif comp==2:
+        if var_not_summed == 'sigma':
+            title_str = " $\\left( \sum\limits_{s, t} s(s+1)|w_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 't':
+            title_str = " $\\left( \sum\limits_{s, \sigma} s(s+1)|w_{st}(\sigma)|^2 \\right)^{1/2}$ "
+        elif var_not_summed == 's-|t|':
+            title_str = " $\\left( \sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  s(s+1)|w_{st}(\sigma)|^2 \\right)^{1/2}$ "
+    return title_str
+
+
 # {{{ analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma'):
 def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='lct',
                         figaxs=None):
@@ -43,16 +69,16 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
     smtp_global = np.arange(ellmax_global+1)
     if figaxs == None:
         fig, axs = plt.subplots(nrows=2, ncols=4, figsize=(20, 8))
-        fig.subplots_adjust(top=0.8)
-        fig.suptitle(title_str, fontsize=18, y=1.0)
-        fig.text(0.0, 0.5, 'Convective power in m/s', va='center', rotation='vertical',
-                 fontsize=18)
+        fig.subplots_adjust(bottom=0.1, top=0.9, left=0.05)
+        fig.suptitle(title_str, fontsize=26, y=1.0, x=0.52)
+        fig.text(0.02, 0.50, 'Convective power in m/s', va='center', rotation='vertical',
+                 fontsize=26)
         if var_not_summed == 'sigma':
-            fig.text(0.5, 0.01, " $\sigma$ in $\mu$Hz", ha='center', fontsize=18)
+            fig.text(0.52, 0.01, " $\sigma$ in $\mu$Hz", ha='center', fontsize=26)
         elif var_not_summed == 't':
-            fig.text(0.5, 0.01, " Azimuthal degree $t$ ", ha='center', fontsize=18)
+            fig.text(0.52, 0.01, " Azimuthal degree $t$ ", ha='center', fontsize=26)
         elif var_not_summed == 's-|t|':
-            fig.text(0.5, 0.01, "$s - |t|$", ha='center', fontsize=18)
+            fig.text(0.52, 0.01, "$s - |t|$", ha='center', fontsize=26)
     else:
         fig, axs = figaxs
 
@@ -68,40 +94,40 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
         xst = np.arange(lmax+1)
 
         if var_not_summed == 'sigma':
-            axs.flatten()[i].semilogy(sigma_pos, abs(u[i, :]),
+            axs.flatten()[i].plot(sigma_pos, abs(u[i, :]),
                                       color=pltclr,
                                       linestyle=pltsty)
-            umax, umin = abs(u[i, :]).max()*3, abs(u[i, :]).min()/10.
+            # umax, umin = abs(u[i, :]).max()*1.05, abs(u[i, :]).min()/10.
 
         elif var_not_summed == 't':
-            axs.flatten()[i].semilogy(tarr_global, abs(u[i, :]),
+            axs.flatten()[i].plot(tarr_global, abs(u[i, :]),
                                       color=pltclr,
                                       linestyle=pltsty)
             axs.flatten()[i].set_xlim([-lmax-10, lmax+10])
             masknan = ~np.isnan(u[i, :])
-            umax, umin = abs(u[i, masknan]).max()*3, abs(u[i, masknan]).min()/10.
+            # umax, umin = abs(u[i, masknan]).max()*1.05, abs(u[i, masknan]).min()/10.
 
         elif var_not_summed == 's-|t|':
-            axs.flatten()[i].semilogy(smtp_global, abs(u[i, :]),
+            axs.flatten()[i].plot(smtp_global, abs(u[i, :]),
                                   color=pltclr,
                                   linestyle=pltsty)
             axs.flatten()[i].set_xlim([0, lmax+10])
             masknan = ~np.isnan(u[i, :])
-            umax, umin = abs(u[i, masknan]).max()*3, abs(u[i, masknan]).min()/10.
+            # umax, umin = abs(u[i, masknan]).max()*1.05, abs(u[i, masknan]).min()/10.
 
-        axs.flatten()[i].set_title("$s \\in $ " + f"({lmin}, {lmax}]", fontsize=15)
-        axs.flatten()[i].set_ylim([umin, umax])
-        axs.flatten()[i].tick_params(axis='both', which='major', labelsize=15)
-        axs.flatten()[i].tick_params(axis='both', which='minor', labelsize=15)
-        if figaxs == None:
-            ymin, ymax = axs.flatten()[i].get_ylim()
-            if ymax <= umax:
-                ymax = umax
-            if ymin >= umin:
-                ymin = umin
-            axs.flatten()[i].set_ylim([ymin, ymax])
+        axs.flatten()[i].set_title("$s \\in $ " + f"({lmin}, {lmax}]", fontsize=22)
+        # axs.flatten()[i].set_ylim([umin, umax])
+        axs.flatten()[i].tick_params(axis='both', which='major', labelsize=22)
+        axs.flatten()[i].tick_params(axis='both', which='minor', labelsize=22)
+        # if figaxs == None:
+            # ymin, ymax = axs.flatten()[i].get_ylim()
+            # if ymax <= umax:
+                # ymax = umax
+            # if ymin >= umin:
+                # ymin = umin
+            # axs.flatten()[i].set_ylim([ymin, ymax])
         # axs.flatten()[i].legend()
-    fig.tight_layout(pad=3)
+    fig.tight_layout(rect=[0.05, 0.1, 1.0, 0.9])
     bar.finish()
     return fig, axs
 # }}} analyze_blocks_plot(u, comp, num_blocks, lmax, var_not_summed='sigma')
@@ -248,37 +274,65 @@ def load_inv_data():
     bar.finish()
     print(f"-- Computing FFT of inverted data ..")
 
-    vst_time = vst_time[:time_count, :] * 1.0
-    wst_time = wst_time[:time_count, :] * 1.0
+    vst_time = vst_time[:time_count, :] * np.sqrt(2)
+    wst_time = wst_time[:time_count, :] * np.sqrt(2)
     vst_sigma = np.fft.fft(vst_time, axis=0)/time_count
     wst_sigma = np.fft.fft(wst_time, axis=0)/time_count
     return vst_sigma, wst_sigma, time_count, inv_exists
 
 
+# {{{ def load_hath():
+def load_hath(axs):
+    ulm_hath = np.loadtxt("/scratch/g.samarth/dopplervel/datafiles/green.csv",
+                          delimiter=",")
+    vlm_hath = np.loadtxt("/scratch/g.samarth/dopplervel/datafiles/red.csv",
+                          delimiter=",")
+    wlm_hath = np.loadtxt("/scratch/g.samarth/dopplervel/datafiles/blue.csv",
+                          delimiter=",")
+
+    upow = ulm_hath[:, 1] / np.sqrt(ulm_hath[:, 0])
+    vpow = vlm_hath[:, 1] * np.sqrt(vlm_hath[:, 0]+1)
+    wpow = wlm_hath[:, 1] * np.sqrt(wlm_hath[:, 0]+1)
+
+    axs.flatten()[0].loglog(vlm_hath[:, 0], vpow, '-.b', label='hathaway')
+    axs.flatten()[1].loglog(wlm_hath[:, 0], wpow, '-.b', label='hathaway')
+    axs.flatten()[2].loglog(ulm_hath[:, 0], upow, '-.b', label='hathaway')
+    return axs
+# }}} load_hath(axs)
+
+
 def plot_power_spectrum():
     psv_lct = sum_power(vst_sigma_lct, 1, ellArr, emmArr, var_not_summed='s')
     psw_lct = sum_power(wst_sigma_lct, 2, ellArr, emmArr, var_not_summed='s')
-    psv_inv = sum_power(vst_sigma_inv*1.4, 1, ellArr, emmArr, var_not_summed='s')
-    psw_inv = sum_power(wst_sigma_inv*1.4, 2, ellArr, emmArr, var_not_summed='s')
+    psu_inv = sum_power(ust_sigma_inv, 0, ellArr, emmArr, var_not_summed='s')
+    psv_inv = sum_power(vst_sigma_inv, 1, ellArr, emmArr, var_not_summed='s')
+    psw_inv = sum_power(wst_sigma_inv, 2, ellArr, emmArr, var_not_summed='s')
     hor_pow_lct = np.sqrt(psv_lct**2 + psw_lct**2)
     hor_pow_inv = np.sqrt(psv_inv**2 + psw_inv**2)
 
-    fig = plt.figure(figsize=(12, 4))
-    plt.subplot(131)
-    plt.loglog(psv_lct, 'k')
-    plt.loglog(psv_inv, 'r')
-    plt.loglog(psv_lct/psv_inv, '--b')
+    ells = np.arange(len(psu_inv))
 
-    plt.subplot(132)
-    plt.loglog(psw_lct, 'k')
-    plt.loglog(psw_inv, 'r')
-    plt.loglog(psw_lct/psw_inv, '--b')
+    fig, axs = plt.subplots(figsize=(12, 4), nrows=1, ncols=3)
+    fig.subplots_adjust(bottom=0.1, left=0.05)
+    # fig.suptitle(, fontsize=26, y=1.0, x=0.52)
+    fig.text(0.02, 0.50, 'Convective power in m/s',
+             va='center', rotation='vertical', fontsize=26)
+    fig.text(0.52, 0.01, "Spherical harmonic degree $s$",
+             ha='center', fontsize=26)
+    axs = load_hath(axs)
 
-    plt.subplot(133)
-    plt.loglog(hor_pow_lct, 'k')
-    plt.loglog(hor_pow_inv, 'r')
-    plt.loglog(hor_pow_lct/hor_pow_inv, '--b')
-    plt.tight_layout()
+    axs.flatten()[0].loglog(psv_lct, 'k')
+    axs.flatten()[0].loglog(psv_inv, 'r')
+    axs.flatten()[0].set_title("Poloidal flow")
+
+    axs.flatten()[1].loglog(psw_lct, 'k')
+    axs.flatten()[1].loglog(psw_inv, 'r')
+    axs.flatten()[1].set_title("Toroidal flow")
+
+    axs.flatten()[2].loglog(psu_inv, 'r')
+    axs.flatten()[2].set_title("Radial flow")
+
+    fig.tight_layout(rect=[0.05, 0.1, 1.0, 1.0])
     return fig
 
 
@@ -288,7 +342,7 @@ if __name__ == "__main__":
     lmax_inv = np.load(f"{data_dir_inv}/alm.data.inv.final_test005.npz")['ellmax']
     print(f"lmax_inv = {lmax_inv}")
     tot_blocks = 8
-    daymax = 360 
+    daymax = 360
 
     arrlm = np.load(f"{data_dir}/arrlm.npz")
     ellArr_lct, emmArr_lct = arrlm['ellArr'], arrlm['emmArr']
@@ -311,31 +365,35 @@ if __name__ == "__main__":
         print(f" == Plotting for var_not_summed = {var_not_summed} == ")
         # computing and plotting inverted data
         v_blocks = analyze_blocks(vst_sigma_inv, 1, tot_blocks,
-                                var_not_summed=var_not_summed, whichdata='inv')
+                                  var_not_summed=var_not_summed,
+                                  whichdata='inv')
         w_blocks = analyze_blocks(wst_sigma_inv, 2, tot_blocks,
-                                var_not_summed=var_not_summed, whichdata='inv')
+                                  var_not_summed=var_not_summed,
+                                  whichdata='inv')
         fig1, axs1 = analyze_blocks_plot(v_blocks*np.sqrt(2), 1, tot_blocks,
-                                        var_not_summed=var_not_summed, whichdata='inv')
+                                         var_not_summed=var_not_summed,
+                                         whichdata='inv')
         fig2, axs2 = analyze_blocks_plot(w_blocks*np.sqrt(2), 2, tot_blocks,
-                                        var_not_summed=var_not_summed, whichdata='inv')
+                                         var_not_summed=var_not_summed,
+                                         whichdata='inv')
 
         # computing and plotting LCT data
         v_blocks = analyze_blocks(vst_sigma_lct, 1, tot_blocks,
-                                var_not_summed=var_not_summed, whichdata='lct')
+                                  var_not_summed=var_not_summed,
+                                  whichdata='lct')
         w_blocks = analyze_blocks(wst_sigma_lct, 2, tot_blocks,
-                                var_not_summed=var_not_summed, whichdata='lct')
+                                  var_not_summed=var_not_summed,
+                                  whichdata='lct')
         fig1, axs1 = analyze_blocks_plot(v_blocks, 1, tot_blocks,
-                                        var_not_summed=var_not_summed, whichdata='lct',
-                                        figaxs=(fig1, axs1))
+                                         var_not_summed=var_not_summed,
+                                         whichdata='lct', figaxs=(fig1, axs1))
         fig2, axs2 = analyze_blocks_plot(w_blocks, 2, tot_blocks,
-                                        var_not_summed=var_not_summed, whichdata='lct',
-                                        figaxs=(fig2, axs2))
+                                         var_not_summed=var_not_summed,
+                                         whichdata='lct', figaxs=(fig2, axs2))
 
         fig1.savefig(f"/scratch/g.samarth/plots/figv_{var_not_summed}.pdf")
         fig2.savefig(f"/scratch/g.samarth/plots/figw_{var_not_summed}.pdf")
 
         del fig1, fig2, axs1, axs2
 
-    fig3 = plot_power_spectrum()
-    fig3.savefig("/scratch/g.samarth/plots/figps.pdf")
 
