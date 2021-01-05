@@ -62,9 +62,9 @@ def get_title_new(comp, var_not_summed='sigma'):
 def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='lct',
                         figaxs=None):
     title_str = get_title(comp, var_not_summed)
-    block_size = LMAX // num_blocks
     lmin, lmax = 0, 0
-    ellmax_global = int(ellArr.max())
+    ellmax_global = int(max(ellArr_lct.max(), ellArr_inv.max()))
+    block_size = ellmax_global // num_blocks
     tarr_global = np.arange(-ellmax_global, ellmax_global+1)
     smtp_global = np.arange(ellmax_global+1)
     if figaxs == None:
@@ -148,7 +148,19 @@ def sum_power(alm, comp, ell, emm, var_not_summed):
     mask_neg_freq = freq_arr <= 0
     sigma_pos = freq_arr[mask_pos_freq]
     sigma_neg = freq_arr[mask_neg_freq]
-    lmin, lmax = int(ell.min()), int(ellArr.max())
+    lmax = int(max(ellArr_lct.max(), ellArr_inv.max()))
+    if len(ell) == 0:
+        if var_not_summed == 'sigma':
+            totpower = np.zeros(len(sigma_pos), dtype=float)*np.nan
+        elif var_not_summed == 't':
+            totpower = np.zeros(2*lmax+1, dtype=float)*np.nan
+        elif var_not_summed == 's-|t|':
+            totpower = np.zeros(lmax+1, dtype=float)*np.nan
+        elif var_not_summed == 's':
+            totpower = np.zeros(lmax+1, dtype=float)*np.nan
+        return totpower
+
+    lmin = int(ell.min())
     alm_sq_scaled = abs(alm)**2 if comp == 0 else ell*(ell+1)*abs(alm)**2
     if var_not_summed == 'sigma':
         totpower = np.sqrt(alm_sq_scaled[mask_pos_freq, :].sum(axis=1))
@@ -197,16 +209,22 @@ def sum_power(alm, comp, ell, emm, var_not_summed):
 # {{{ def analyze_blocks(u, comp, num_blocks, var_not_summed='sigma'):
 def analyze_blocks(u, comp, num_blocks, var_not_summed='sigma',
                    whichdata='lct'):
-    block_size = LMAX // num_blocks
+    if whichdata == 'lct':
+        ellArr, emmArr = ellArr_lct, emmArr_lct
+    elif whichdata == 'inv':
+        ellArr, emmArr = ellArr_inv, emmArr_inv
+
+    ellmax = int(ellArr.max())
+    ellmax_global = max(ellArr_lct.max(), ellArr_inv.max())
+    block_size = ellmax_global // num_blocks
+
     lmin, lmax = 0, 0
     if var_not_summed == 'sigma':
         sigma_pos = freq_arr[freq_arr >= 0]
         u_block = np.zeros((num_blocks, len(sigma_pos)), dtype=np.float)
     elif var_not_summed == 't':
-        ellmax_global = ellArr.max()
         u_block = np.zeros((num_blocks, 2*ellmax_global + 1), dtype=np.float)
     elif var_not_summed == 's-|t|':
-        ellmax_global = ellArr.max()
         u_block = np.zeros((num_blocks, ellmax_global + 1), dtype=np.float)
 
     bar = Bar(f'[{comp}-{whichdata}] - Computing block number: ', max=num_blocks)
@@ -232,16 +250,17 @@ def analyze_blocks(u, comp, num_blocks, var_not_summed='sigma',
 def get_alm(daynum, whichdata='lct'):
     if whichdata == 'lct':
         alm = np.load(f"{data_dir}/almo_2011_{daynum:03d}.npz")
-        return alm['vlm'][ellArr_lct <= LMAX], alm['wlm'][ellArr_lct <= LMAX]
+        return alm['vlm'], alm['wlm']
     elif whichdata == 'inv':
         alm = np.load(f"{data_dir_inv}/alm.data.inv.final_test{daynum:03d}.npz")
-        return alm['vlm'][ellArr_inv <= LMAX], alm['wlm'][ellArr_inv <= LMAX]
+        return alm['vlm'], alm['wlm']
 # }}} get_alm(daynum)
 
 
 # {{{ def load_lct_data():
 def load_lct_data(inv_exists):
-    arrlen = len(ellArr)
+    mask_ell = ellArr_lct <= LMAX
+    arrlen = len(ellArr_lct[mask_ell])
 
     vst_time = np.zeros((daymax, arrlen), dtype=np.complex)
     wst_time = np.zeros((daymax, arrlen),  dtype=np.complex)
@@ -254,8 +273,8 @@ def load_lct_data(inv_exists):
             inv_exists.index(daynum)
             try:
                 vst, wst = get_alm(daynum, whichdata='lct')
-                vst_time[time_count, :] = vst  #analyze_blocks(vst, 1, tot_blocks, lmax)
-                wst_time[time_count, :] = wst  #analyze_blocks(wst, 2, tot_blocks, lmax)
+                vst_time[time_count, :] = vst[mask_ell]  #analyze_blocks(vst, 1, tot_blocks, lmax)
+                wst_time[time_count, :] = wst[mask_ell]  #analyze_blocks(wst, 2, tot_blocks, lmax)
                 time_count += 1
             except FileNotFoundError:
                 pass
@@ -273,7 +292,7 @@ def load_lct_data(inv_exists):
 
 
 def load_inv_data():
-    arrlen = len(ellArr)
+    arrlen = len(ellArr_inv)
     inv_exists = []
 
     vst_time = np.zeros((daymax, arrlen), dtype=np.complex)
@@ -367,13 +386,15 @@ if __name__ == "__main__":
     arrlm = np.load(f"{data_dir}/arrlm.npz")
     ellArr_lct, emmArr_lct = arrlm['ellArr'], arrlm['emmArr']
     ellArr_inv, emmArr_inv = hp.sphtfunc.Alm.getlm(lmax_inv)
-    ellArr = ellArr_lct[ellArr_lct <= LMAX]
-    emmArr = emmArr_lct[ellArr_lct <= LMAX]
-    var_list = ['t', 'sigma', 's-|t|']
+    var_list = ['t', 's-|t|', 'sigma']
     var_not_summed = 't'  # allowed options 'sigma', 't' and 's-|t|'
 
     vst_sigma_inv, wst_sigma_inv, time_count_inv, inv_exists = load_inv_data()
     vst_sigma_lct, wst_sigma_lct, time_count_lct = load_lct_data(inv_exists)
+    mask_ell = ellArr_lct <= LMAX
+    ellArr_lct = ellArr_lct[mask_ell]
+    emmArr_lct = emmArr_lct[mask_ell]
+
     assert time_count_lct == time_count_inv, "time counts don't match"
     time_count = time_count_lct
     time_arr = np.arange(time_count)
@@ -411,7 +432,7 @@ if __name__ == "__main__":
                                          var_not_summed=var_not_summed,
                                          whichdata='lct', figaxs=(fig2, axs2))
 
-        fig1.savefig(f"/scratch/g.samarth/plots/figv_{var_not_summed}.pdf")
-        fig2.savefig(f"/scratch/g.samarth/plots/figw_{var_not_summed}.pdf")
+        fig1.savefig(f"/scratch/g.samarth/plots/compare_figv_{var_not_summed}.pdf")
+        fig2.savefig(f"/scratch/g.samarth/plots/compare_figw_{var_not_summed}.pdf")
 
         del fig1, fig2, axs1, axs2

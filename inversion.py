@@ -797,8 +797,8 @@ def plot_inv_actual(inv, act, ell, args):
     fig.subplots_adjust(bottom=0.1, top=0.9, left=0.08)
     # fig.suptitle(title_str, fontsize=26, y=1.0, x=0.52)
     plt.rcParams.update({'font.size': 16})
-    fig.text(0.55, 0.01, " Azimuthal degree $t$ ", ha='center') #, fontsize=26)
-    fig.text(0.01, 0.50, 'Velocity \n (m/s)', va='center',
+    fig.text(0.55, 0.01, " Spherical harmonic degree $s$ ", ha='center') #, fontsize=26)
+    fig.text(0.01, 0.50, 'Velocity \n (ms${}^{-1}$)', va='center',
              rotation='horizontal') #, fontsize=26)
     axs.flatten()[0].set_title(f"Radial {title_suffix}", fontsize=14)
     axs.flatten()[0].loglog(np.sqrt(ell * inv[0]), 'r', label='inverted')
@@ -1041,7 +1041,7 @@ if __name__ == "__main__":
                               ell, args)
 #        fig.savefig(fname + ".png")
         plt.show(fig)
-        fig.savefig('/scratch/g.samarth/plots/synth/solarlike.pdf')
+        fig.savefig('/scratch/g.samarth/plots/synth/sparse.pdf')
 #        plt.close(fig)
     else:
         plt.figure()
