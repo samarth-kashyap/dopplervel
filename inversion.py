@@ -565,8 +565,8 @@ def inv_reg2(A, regparam):
     reg2[1:, :-1] += offd2
     reg2[:-1, 1:] += offd2
     reg = reg2[1:-1, :].copy()
-    return np.linalg.inv(A.transpose().dot(A)
-                         + (regparam/16.) * reg.transpose().dot(reg))\
+    return np.linalg.inv(A.transpose().dot(A) +
+                         (regparam/16.) * reg.transpose().dot(reg))\
                     .dot(A.transpose())
 # }}} inv_reg2(A, regparam)
 
@@ -587,13 +587,15 @@ def inv_reg3(A, regparam):
 
     """
     reg2 = 3*np.identity(A.shape[0])
+    _reg1 = np.identity(A.shape[0])
     offd2 = -1*np.identity(A.shape[0]-1)
     reg2[:-1, 1:] += 3*offd2
     reg2[1:, :-1] += offd2
     reg2[:-2, 2:] += -offd2[1:, 1:]
     reg = reg2[1:-2, :].copy()
     return np.linalg.inv(A.transpose().dot(A)
-                         + (regparam/64.) * reg.transpose().dot(reg))\
+                         + (regparam/64.) * reg.transpose().dot(reg)
+                         + (regparam/500.) * _reg1.T.dot(_reg1))\
                     .dot(A.transpose())
 # }}} inv_reg3(A, regparam)
 
@@ -721,6 +723,7 @@ def get_a_ainv(t, args):
                                         + "fullMat"+str(t).zfill(2)+".npz",
                                         A=A)
                 Ainv = inv_reg1supp(A, 1e-3)
+                # Ainv = inv_reg1supp(A, 1e-2)
     else:
         """
         if args.fat:
@@ -797,7 +800,7 @@ def plot_inv_actual(inv, act, ell, args):
     fig.subplots_adjust(bottom=0.1, top=0.9, left=0.08)
     # fig.suptitle(title_str, fontsize=26, y=1.0, x=0.52)
     plt.rcParams.update({'font.size': 16})
-    fig.text(0.55, 0.01, " Spherical harmonic degree $s$ ", ha='center') #, fontsize=26)
+    fig.text(0.55, 0.01, " Spherical harmonic degree $\ell$ ", ha='center') #, fontsize=26)
     fig.text(0.01, 0.50, 'Velocity \n (ms${}^{-1}$)', va='center',
              rotation='horizontal') #, fontsize=26)
     axs.flatten()[0].set_title(f"Radial {title_suffix}", fontsize=14)
