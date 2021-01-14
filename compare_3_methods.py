@@ -50,9 +50,12 @@ def load_hath(axs):
     wlm_hath = np.loadtxt("/scratch/g.samarth/dopplervel/datafiles/blue.csv",
                           delimiter=",")
 
-    axs[0].loglog(vlm_hath[:, 0], vlm_hath[:, 1], 'b', label='hathaway', alpha=0.7)
-    axs[1].loglog(wlm_hath[:, 0], wlm_hath[:, 1], 'b', label='hathaway', alpha=0.7)
-    axs[2].loglog(ulm_hath[:, 0], ulm_hath[:, 1], 'b', label='hathaway', alpha=0.7)
+    axs[0].loglog(vlm_hath[:, 0], vlm_hath[:, 1], 'b', label='hathaway',
+                  alpha=0.7, rasterized=True)
+    axs[1].loglog(wlm_hath[:, 0], wlm_hath[:, 1], 'b', label='hathaway',
+                  alpha=0.7, rasterized=True)
+    axs[2].loglog(ulm_hath[:, 0], ulm_hath[:, 1], 'b', label='hathaway',
+                  alpha=0.7, rasterized=True)
     return axs
 
 def load_lct(axs):
@@ -63,8 +66,10 @@ def load_lct(axs):
     psv_lct = computePS(lct_ell, lct_emm, lct_ell.max(), lct_vlm)
     psw_lct = computePS(lct_ell, lct_emm, lct_ell.max(), lct_wlm)
 
-    axs[0].loglog(psv_lct, 'k', label='LCT', alpha=0.9)
-    axs[1].loglog(psw_lct, 'k', label='LCT', alpha=0.9)
+    axs[0].loglog(psv_lct, 'k', label='LCT',
+                  alpha=0.9, rasterized=True)
+    axs[1].loglog(psw_lct, 'k', label='LCT',
+                  alpha=0.9, rasterized=True)
     return axs
 
 def load_inv(axs, compute_u_by_tot=False):
@@ -79,9 +84,12 @@ def load_inv(axs, compute_u_by_tot=False):
     psv = computePS(ellArr, emmArr, lmax, vlm)
     psw = computePS(ellArr, emmArr, lmax, wlm)
     psu = computePS(ellArr, emmArr, lmax, ulm)
-    axs[0].loglog(psv[:lmax_plot], color='red', label='inversion', alpha=0.7)
-    axs[1].loglog(psw[:lmax_plot], color='red', label='inversion', alpha=0.7)
-    axs[2].loglog(psu[:lmax_plot], color='red', label='inversion', alpha=0.7)
+    axs[0].loglog(psv[:lmax_plot], color='red', label='inversion',
+                  alpha=0.7, rasterized=True)
+    axs[1].loglog(psw[:lmax_plot], color='red', label='inversion',
+                  alpha=0.7, rasterized=True)
+    axs[2].loglog(psu[:lmax_plot], color='red', label='inversion',
+                  alpha=0.7, rasterized=True)
     if compute_u_by_tot:
         u_by_tot = psu / np.sqrt(psu**2 + psv**2 + psw**2)
         return axs, u_by_tot
@@ -94,7 +102,7 @@ if __name__ == "__main__":
     fig.subplots_adjust(bottom=0.1, top=0.9, left=0.08)
     fig.text(0.02, 0.50, 'Velocity \n  (ms${}^{-1}$)',
              va='center', rotation='horizontal', fontsize=14)
-    fig.text(0.54, 0.01, " Spherical harmonic degree $s$ ",
+    fig.text(0.54, 0.01, " Spherical harmonic degree $\ell$ ",
              ha='center', fontsize=14)
     axs = load_hath(axs)
     axs = load_lct(axs)
@@ -113,7 +121,7 @@ if __name__ == "__main__":
     ax2.plot(u_by_tot[:1500]*100, 'k', linewidth=0.5)
     ax2.set_ylim([1, 11])
     ax2.set_ylabel("\% Radial power", fontsize=10)
-    ax2.set_xlabel("Spherical Harmonic degree $s$", fontsize=10)
+    ax2.set_xlabel("Spherical Harmonic degree $\ell$", fontsize=10)
     ax2.tick_params(axis='both', which='major', labelsize=10)
     ax2.tick_params(axis='both', which='minor', labelsize=10)
     fig2.tight_layout()

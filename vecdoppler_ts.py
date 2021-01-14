@@ -12,25 +12,25 @@ LMAX = 375
 def get_title(comp, var_not_summed='sigma'):
     if comp==0:
         if var_not_summed == 'sigma':
-            title_str = " $\\sqrt{\sum\limits_{s, t} |u_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\\ell, m} |u_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 't':
-            title_str = " $\\sqrt{\sum\limits_{s, \sigma} |u_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, \sigma} |u_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 's-|t|':
-            title_str = " $\\sqrt{\sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  |u_{st}(\sigma)|^2}$ s $\in$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, m, \sigma; \ell-|m|=\mathsf{const}}  |u_{\ell m}(\sigma)|^2}$ s $\in$ "
     elif comp==1:
         if var_not_summed == 'sigma':
-            title_str = " $\\sqrt{\sum\limits_{s, t} s(s+1)|v_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, m} \ell(\ell+1)|v_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 't':
-            title_str = " $\\sqrt{\sum\limits_{s, \sigma} s(s+1)|v_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, \sigma} \ell(\ell+1)|v_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 's-|t|':
-            title_str = " $\\sqrt{\sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  s(s+1)|v_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, m, \sigma; \ell-|m|=\mathsf{const}}  \ell(\ell+1)|v_{\ell m}(\sigma)|^2}$ "
     elif comp==2:
         if var_not_summed == 'sigma':
-            title_str = " $\\sqrt{\sum\limits_{s, t} s(s+1)|w_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, m} \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 't':
-            title_str = " $\\sqrt{\sum\limits_{s, \sigma} s(s+1)|w_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, \sigma} \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 's-|t|':
-            title_str = " $\\sqrt{\sum\limits_{s, t, \sigma; s-|t|=\mathsf{const}}  s(s+1)|w_{st}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, t, \sigma; \ell-|t|=\mathsf{const}}  \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
     return title_str
 
 def get_title_new(comp, var_not_summed='sigma'):
@@ -76,9 +76,9 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
         if var_not_summed == 'sigma':
             fig.text(0.52, 0.01, " $\sigma$ in $\mu$Hz", ha='center', fontsize=26)
         elif var_not_summed == 't':
-            fig.text(0.52, 0.01, " Azimuthal degree $t$ ", ha='center', fontsize=26)
+            fig.text(0.52, 0.01, " Azimuthal degree $m$ ", ha='center', fontsize=26)
         elif var_not_summed == 's-|t|':
-            fig.text(0.52, 0.01, "$s - |t|$", ha='center', fontsize=26)
+            fig.text(0.52, 0.01, "$\ell - |m|$", ha='center', fontsize=26)
     else:
         fig, axs = figaxs
 
@@ -103,7 +103,10 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
             axs.flatten()[i].plot(tarr_global, abs(u[i, :]),
                                       color=pltclr,
                                       linestyle=pltsty)
-            axs.flatten()[i].set_xlim([-lmin-2, lmin+2])
+            if lmin == 0:
+                axs.flatten()[i].set_xlim([-lmax-2, lmax+2])
+            else:
+                axs.flatten()[i].set_xlim([-lmin-2, lmin+2])
             masknan = ~np.isnan(u[i, :])
             # umax, umin = abs(u[i, masknan]).max()*1.05, abs(u[i, masknan]).min()/10.
 
@@ -119,11 +122,11 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
             # umax, umin = abs(u[i, masknan]).max()*1.05, abs(u[i, masknan]).min()/10.
 
         if lmin > 0:
-            axs.flatten()[i].set_title("$s \\in $ " + f"({lmin}, {lmax}];  " +
-                                    "    $|t| \\le$ " f"{lmin}", fontsize=22)
+            axs.flatten()[i].set_title("$\ell \\in $ " + f"({lmin}, {lmax}];  " +
+                                    "    $|m| \\le$ " f"{lmin}", fontsize=22)
         else:
-            axs.flatten()[i].set_title("$s \\in $ " + f"({lmin}, {lmax}];  " +
-                                    "    $|t| \\le$ " f"{lmax}", fontsize=22)
+            axs.flatten()[i].set_title("$\ell \\in $ " + f"({lmin}, {lmax}];  " +
+                                    "    $|m| \\le$ " f"{lmax}", fontsize=22)
         # axs.flatten()[i].set_ylim([umin, umax])
         axs.flatten()[i].xaxis.set_major_locator(plt.MaxNLocator(5))
         axs.flatten()[i].tick_params(axis='both', which='major', labelsize=22)
