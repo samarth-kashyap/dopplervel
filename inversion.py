@@ -1,5 +1,5 @@
 # {{{ Library imports
-from sklearn import linear_model as sklin  # for L1 regularization using LASSO
+# from sklearn import linear_model as sklin  # for L1 regularization using LASSO
 from pyshtools import legendre as pleg     # Legendre polynomials
 from scipy.integrate import simps          # Integration - simpsons
 import matplotlib.pyplot as plt            # Plotting
@@ -974,7 +974,9 @@ if __name__ == "__main__":
         assert uot.shape[0] == A.shape[0] == Ainv.shape[0]
 
         if args.l1:
-            clf = sklin.Lasso(alpha=1e-4, max_iter=10000)
+            # clf = sklin.Lasso(alpha=1e-4, max_iter=10000)
+            # commenting out for convenience
+            clf = None
             clf.fit(A, uot.real)
             uAt1 = clf.coef_
             clf.fit(A, uot.imag)
@@ -1039,12 +1041,12 @@ if __name__ == "__main__":
         pswth = computePS(wlmAth, lmaxCalc, ellArr, emmArr)
         pstotth = np.sqrt(psuth**2 + psvth**2 + pswth**2)
 
-        fig = plot_inv_actual((psu, psv, psw),
-                              (psuth, psvth, pswth),
-                              ell, args)
+        # fig = plot_inv_actual((psu, psv, psw),
+                              # (psuth, psvth, pswth),
+                              # ell, args)
 #        fig.savefig(fname + ".png")
-        plt.show(fig)
-        fig.savefig('/scratch/g.samarth/plots/synth/sparse.pdf')
+        # plt.show(fig)
+        # fig.savefig('/scratch/g.samarth/plots/synth/sparse.pdf')
 #        plt.close(fig)
     else:
         plt.figure()
