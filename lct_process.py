@@ -12,6 +12,8 @@ print(f"NSIDE = {NSIDE}")
 # {{{ reading arguments from command line
 parser = argparse.ArgumentParser()
 parser.add_argument("--daynum", help="day number", type=int)
+parser.add_argument("--chris", help="data provided by Chris",
+                    action="store_true")
 parser.add_argument("--year", help="year", type=int)
 parser.add_argument("--testrun", help="run tests", action="store_true")
 args = parser.parse_args()
@@ -130,21 +132,30 @@ def computePS(ellArr, emmArr, lmax, coefs):
 # }}} computePS(ellArr, emmArr, lmax, coefs)
 
 if __name__ == "__main__":
-    data_dir = "/scratch/seismogroup/LCT_data"
-    lat_file = f"{data_dir}/{args.year}_lat_files.txt"
-    lon_file = f"{data_dir}/{args.year}_lon_files.txt"
-    with open(lat_file, "r") as f:
-        lat_fnames = f.read().splitlines()
+    if args.chris:
+        data_dir = "/scratch/seismogroup/LCT_data/gaussian2deg"
+        vlat = np.load(f"{data_dir}/v_lat_{args.daynum:04d}.npy")
+        vlon = np.load(f"{data_dir}/v_lon_{args.daynum:04d}.npy")
+        print(f"[{args.year}] [{args.daynum}] Loading LCT maps")
+        mask0 = vlat==0
+        vlat[mask0] = np.nan
+        vlon[mask0] = np.nan
+    else:
+        data_dir = "/scratch/seismogroup/LCT_data"
+        lat_file = f"{data_dir}/{args.year}_lat_files.txt"
+        lon_file = f"{data_dir}/{args.year}_lon_files.txt"
+        with open(lat_file, "r") as f:
+            lat_fnames = f.read().splitlines()
 
-    with open(lon_file, "r") as f:
-        lon_fnames = f.read().splitlines()
+        with open(lon_file, "r") as f:
+            lon_fnames = f.read().splitlines()
 
-    latfname = lat_fnames[args.daynum]
-    lonfname = lon_fnames[args.daynum]
+        latfname = lat_fnames[args.daynum]
+        lonfname = lon_fnames[args.daynum]
 
-    print(f"[{args.year}] [{args.daynum}] Loading LCT maps")
-    vlat = fits.open(f"{data_dir}/{latfname}")[0].data
-    vlon = fits.open(f"{data_dir}/{lonfname}")[0].data
+        print(f"[{args.year}] [{args.daynum}] Loading LCT maps")
+        vlat = fits.open(f"{data_dir}/{latfname}")[0].data
+        vlon = fits.open(f"{data_dir}/{lonfname}")[0].data
 
     mask = ~np.isnan(vlat)
 
@@ -172,18 +183,23 @@ if __name__ == "__main__":
     ellmax = hp.sphtfunc.Alm.getlmax(len(alm_v))
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(ellmax)
 
+    if args.chris:
+        lctdir = "LCT_chris"
+    else:
+        lctdir = "LCT"
+
     if args.testrun:
         np.savez_compressed(f"/scratch/g.samarth/HMIDATA/" +
-                            f"LCT/alm_test.npz",
+                            f"{lctdir}/alm_test.npz",
                             vlm=alm_v, wlm=alm_w)
     else:
         np.savez_compressed(f"/scratch/g.samarth/HMIDATA/" +
-                            f"LCT/almo_{args.year}_{args.daynum:03d}.npz",
+                            f"{lctdir}/almo_{args.year}_{args.daynum:03d}.npz",
                             vlm=alm_v, wlm=alm_w)
     #
     if args.daynum==1:
         np.savez_compressed(f"/scratch/g.samarth/HMIDATA/" +
-                            f"LCT/arrlm_{args.year}.npz",
+                            f"{lctdir}/arrlm_{args.year}.npz",
                             ellArr=ellArr, emmArr=emmArr)
 
     print(f"[{args.year}] [{args.daynum}] Plotting and saving")
@@ -199,8 +215,8 @@ if __name__ == "__main__":
     plt.legend()
     if args.testrun:
         plt.savefig(f"/scratch/g.samarth/HMIDATA/" +
-                    f"LCT/lct_sph_test.pdf")
+                    f"{lctdir}/lct_sph_test.pdf")
     else:
         plt.savefig(f"/scratch/g.samarth/HMIDATA/" +
-                    f"LCT/lct_sph_{args.year}_{args.daynum:03d}.pdf")
+                    f"{lctdir}/lct_sph_{args.year}_{args.daynum:03d}.pdf")
 

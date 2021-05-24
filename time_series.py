@@ -7,6 +7,8 @@ import argparse
 # }}} imports
 
 
+NAX = np.newaxis
+
 # {{{ ArgumentParser
 parser = argparse.ArgumentParser()
 parser.add_argument('--hpc', help="Run program on daahpc",
@@ -15,6 +17,9 @@ parser.add_argument('--cchpc', help="Run program on cchpc19",
                     action="store_true")
 parser.add_argument('--datatype', help="\'LCT\' or \'doppler\'",
                     type=str)
+parser.add_argument('--chris', help="Data from chris",
+                    action="store_true")
+parser.add_argument('--year', help='year', type=int)
 args = parser.parse_args()
 
 if args.hpc:
@@ -33,9 +38,14 @@ datatype = args.datatype
 if datatype == 'doppler':
     data_dir = scratch_dir + "HMIDATA/data_analysis/lmax1535/"
 elif datatype == 'LCT':
-    data_dir = "/scratch/g.samarth/HMIDATA/LCT/"
+    if args.chris:
+        lctdir = "LCT_chris"
+    else:
+        lctdir = "LCT"
+    data_dir = f"/scratch/g.samarth/HMIDATA/{lctdir}/"
 
-NTIME = 2 #300
+NTIME = 350
+LMAXSUM = 25
 
 
 # {{{ def load_time_series(NTIME, data_dir):
@@ -70,13 +80,19 @@ def load_time_series(NTIME, data_dir, datatype='doppler'):
             suffix = str(i).zfill(3) + ".npz"
             fname = data_dir + "alm.data.inv.final" + suffix
         elif datatype == 'LCT':
-            fname = f"almo_2011_{i:03d}.npz"
+            fname = data_dir + f"almo_{args.year}_{i:03d}.npz"
         try:
             alm = np.load(fname)
             alm_found = True
         except FileNotFoundError:
             print(f"{fname} not found")
             alm_found = False
+            """
+            if count==0:
+                alm_found = False
+            else:
+                alm_found = True
+            """
             pass
         if count==0 and alm_found:
             if datatype == 'doppler':
@@ -98,6 +114,7 @@ def load_time_series(NTIME, data_dir, datatype='doppler'):
             print(f" i = {i} ")
             count += 1
         elif count>0 and alm_found:
+            print(f"Loaded {fname}")
             if datatype == 'doppler':
                 utime[:, i] = alm['ulm']
             vtime[:, i] = alm['vlm']
@@ -107,7 +124,7 @@ def load_time_series(NTIME, data_dir, datatype='doppler'):
     if datatype == 'doppler':
         return utime, vtime, wtime
     elif datatype == 'LCT':
-        return vtime, wtime
+        return vtime*0.0, vtime, wtime
 # }}} load_time_series(NTIME, data_dir)
 
 
@@ -298,11 +315,127 @@ def analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax):
 # }}} analyze_blocks(ufreq, vfreq, wfreq, ellArr, emmArr, block_size, lmax)
 
 
+
+def compute_lnu(tracking=True):
+    lmax = min(ellArr.max(), 1500) 
+    upow = np.zeros((lmax, NTIME), dtype=np.complex128)
+    vpow = np.zeros((lmax, NTIME), dtype=np.complex128)
+    wpow = np.zeros((lmax, NTIME), dtype=np.complex128)
+    for ell in range(lmax):
+        print(f"ell = {ell}")
+        mask_ell = ellArr == ell
+        if tracking:
+            m = emmArr[mask_ell]
+            omega = 453.1*1e-9*2*np.pi
+            eimot = np.exp(1j*m[:, NAX]*omega*time_arr[NAX, :])
+            utrack = utime[mask_ell, :]*eimot
+            vtrack = vtime[mask_ell, :]*eimot
+            wtrack = wtime[mask_ell, :]*eimot
+            upow[ell, :] = np.sum(abs(np.fft.fft(utrack, axis=1))**2, axis=0)
+            vpow[ell, :] = np.sum(abs(np.fft.fft(vtrack, axis=1))**2, axis=0)
+            wpow[ell, :] = np.sum(abs(np.fft.fft(wtrack, axis=1))**2, axis=0)
+        else:
+            upow[ell, :] = np.sum(abs(np.fft.fft(utime[mask_ell, :],
+                                                 axis=1))**2, axis=0)
+            vpow[ell, :] = np.sum(abs(np.fft.fft(vtime[mask_ell, :],
+                                                 axis=1))**2, axis=0)
+            wpow[ell, :] = np.sum(abs(np.fft.fft(wtime[mask_ell, :],
+                                                 axis=1))**2, axis=0)
+        upow[ell, :] *= ell*(ell+1)/NTIME*2
+        vpow[ell, :] *= ell*(ell+1)/NTIME*2
+        wpow[ell, :] *= ell*(ell+1)/NTIME*2
+    return (upow, vpow, wpow)
+
+
+
+def compute_pow_prasad(tracking=False):
+    lmax = min(ellArr.max(), 1500)
+    lmax = 25
+    upow = np.zeros(NTIME, dtype=np.float)
+    vpow = np.zeros(NTIME, dtype=np.float)
+    wpow = np.zeros(NTIME, dtype=np.float)
+    for ell in range(1, lmax, 2):
+        print(f"ell = {ell}")
+        mask_ell = ellArr == ell
+        if tracking:
+            m = emmArr[mask_ell]
+            omega = 453.1*1e-9*2*np.pi
+            eimot = np.exp(1j*m[:, NAX]*omega*time_arr[NAX, :])
+            utrack = utime[mask_ell, :]*eimot
+            vtrack = vtime[mask_ell, :]*eimot
+            wtrack = wtime[mask_ell, :]*eimot
+            upow[ell, :] = np.sum(abs(np.fft.fft(utrack, axis=1))**2, axis=0)
+            vpow[ell, :] = np.sum(abs(np.fft.fft(vtrack, axis=1))**2, axis=0)
+            wpow[ell, :] = np.sum(abs(np.fft.fft(wtrack, axis=1))**2, axis=0)
+        else:
+            upow += np.sum(2*ell*(ell+1)*abs(np.fft.fft(utime[mask_ell, :],
+                                                        axis=1))**2/NTIME/NTIME, axis=0)
+            vpow += np.sum(2*ell*(ell+1)*abs(np.fft.fft(vtime[mask_ell, :],
+                                                        axis=1))**2/NTIME/NTIME, axis=0)
+            wpow += np.sum(2*ell*(ell+1)*abs(np.fft.fft(wtime[mask_ell, :],
+                                                        axis=1))**2/NTIME/NTIME, axis=0)
+    upow = np.sqrt(upow)
+    vpow = np.sqrt(vpow)
+    wpow = np.sqrt(wpow)
+    return (upow, vpow, wpow)
+
+
+def plot_lnu(uvw):
+    upow, vpow, wpow = uvw
+    lmin = 20
+    maskpos = freq_arr >= 0
+    upow = upow[lmin:, maskpos]
+    vpow = vpow[lmin:, maskpos]
+    wpow = wpow[lmin:, maskpos]
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(7, 7))
+    umax = abs(upow[~np.isnan(upow)]).max()
+    vmax = abs(vpow[~np.isnan(vpow)]).max()
+    wmax = abs(wpow[~np.isnan(wpow)]).max()
+    axs.flatten()[0].imshow(abs(upow), vmax=umax, aspect='auto')
+    axs.flatten()[1].imshow(abs(vpow), vmax=vmax, aspect='auto')
+    axs.flatten()[2].imshow(abs(wpow), vmax=wmax, aspect='auto')
+    return fig, axs
+
+
+def plot_nu(uvw):
+    upow, vpow, wpow = uvw
+    ell = np.arange(upow.shape[0])
+    lmin = 5
+    maskpos = freq_arr >= 0
+    # masklmax = ell <= LMAXSUM
+    masklmax = np.ones_like(ell, dtype=np.bool)
+    upow = np.sqrt(upow[masklmax, :].sum(axis=0))[maskpos]
+    vpow = np.sqrt(vpow[masklmax, :].sum(axis=0))[maskpos]
+    wpow = np.sqrt(wpow[masklmax, :].sum(axis=0))[maskpos]
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(7, 7))
+    axs.flatten()[0].plot(freq_arr[maskpos], abs(upow))
+    axs.flatten()[1].plot(freq_arr[maskpos], abs(vpow))
+    axs.flatten()[2].plot(freq_arr[maskpos], abs(wpow))
+    return fig, axs
+
+
+def plot_prasad(uvw):
+    upow, vpow, wpow = uvw
+    maskpos = freq_arr >= 0
+    upow = upow[maskpos]
+    vpow = vpow[maskpos]
+    wpow = wpow[maskpos]
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(7, 7))
+    axs.flatten()[0].plot(freq_arr[maskpos], abs(upow))
+    axs.flatten()[1].plot(freq_arr[maskpos], abs(vpow))
+    axs.flatten()[2].plot(freq_arr[maskpos], abs(wpow))
+    return fig, axs
+
+
+
 if __name__=="__main__":
-    max_time = NTIME*24*3600  # total time in seconds
+    if args.chris:
+        max_time = NTIME*24*3600  # total time in seconds
+    else:
+        max_time = NTIME*24*3600  # total time in seconds
     time_arr = np.linspace(0, max_time, NTIME)
     dtime = time_arr[1] - time_arr[0]
-    freq_arr = np.fft.fftfreq(time_arr.shape[0], dtime)
+    freq_arr = np.fft.fftfreq(time_arr.shape[0], dtime)*1e-6
     dfreq = freq_arr[1] - freq_arr[0]
 
     utime, vtime, wtime = load_time_series(NTIME, data_dir,
@@ -310,6 +443,9 @@ if __name__=="__main__":
     length_alm = utime.shape[0]
     lmax = hp.sphtfunc.Alm.getlmax(length_alm)
     ellArr, emmArr = hp.sphtfunc.Alm.getlm(lmax)
+    # uvw = compute_lnu(tracking=False)
+    uvw = compute_pow_prasad()
+    fig, axs = plot_prasad(uvw)
     """
     ufreq = np.fft.fft(utime, axis=1, norm="ortho")
     vfreq = np.fft.fft(vtime, axis=1, norm="ortho")
@@ -329,8 +465,10 @@ if __name__=="__main__":
     plt.show()
     """
 
+    """ # {{{ analyzing blocks
     block_size = 50
     analyze_blocks(utime, vtime, wtime, ellArr, emmArr, block_size, lmax)
+    """ # }}} analyzing blocks
 
     ##  ust, vst, wst = get_st_plot(utime, vtime, wtime, ellArr, emmArr, 0, 50)
     ##  plot_all(ust, vst, wst, 0, 50)

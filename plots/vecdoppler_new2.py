@@ -30,7 +30,7 @@ def get_title(comp, var_not_summed='sigma'):
         elif var_not_summed == 't':
             title_str = " $\\sqrt{\sum\limits_{\ell, \sigma} \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
         elif var_not_summed == 's-|t|':
-            title_str = " $\\sqrt{\sum\limits_{\ell, t, \sigma; \ell-|t|=\mathsf{const}}  \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
+            title_str = " $\\sqrt{\sum\limits_{\ell, m, \sigma; \ell-|m|=\mathsf{const}}  \ell(\ell+1)|w_{\ell m}(\sigma)|^2}$ "
     return title_str
 
 
@@ -140,7 +140,7 @@ def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='
                 # ymin = umin
             # axs.flatten()[i].set_ylim([ymin, ymax])
         # axs.flatten()[i].legend()
-    fig.tight_layout(rect=[0.05, 0.1, 1.0, 0.9])
+    fig.tight_layout(rect=[0.05, 0.1, 1.0, 1.0])
     bar.finish()
     return fig, axs
 # }}} analyze_blocks_plot(u, comp, num_blocks, lmax, var_not_summed='sigma')
