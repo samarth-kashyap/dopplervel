@@ -1,3 +1,13 @@
+"""Interpolate HMI Doppler velocity maps onto uniform grids.
+
+This module reads HMI Dopplergram FITS files and interpolates them onto
+a uniform latitude-longitude grid using scipy's griddata function. This
+preprocessing step facilitates subsequent spherical harmonic transforms.
+
+The interpolation converts irregularly sampled HMI data (in helioprojective
+coordinates) to a regular grid in heliographic coordinates.
+"""
+
 from scipy.interpolate import griddata as GD
 from astropy.coordinates import SkyCoord
 from sunpy.coordinates import frames

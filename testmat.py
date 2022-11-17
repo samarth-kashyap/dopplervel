@@ -1,7 +1,30 @@
+"""Test script for comparing old and new leakage matrix implementations.
+
+This utility script loads two versions of the leakage matrix and generates
+diagnostic plots to visualize differences between them. It helps validate
+changes to the matrix generation code.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt 
 
 def plot_real_imag(Ao, An, matsize):
+    """Plot real and imaginary parts of two matrices for comparison.
+    
+    Parameters
+    ----------
+    Ao : np.ndarray
+        Old/original matrix
+    An : np.ndarray
+        New matrix to compare against
+    matsize : int
+        Number of rows to plot
+    
+    Returns
+    -------
+    int
+        Status code (0 for success)
+    """
     for i in range(matsize):
         plt.figure()
         plt.subplot(221)
@@ -25,6 +48,22 @@ def plot_real_imag(Ao, An, matsize):
     return 0
 
 def plot_abs(Ao, An, matsize):
+    """Plot absolute values of two matrices for comparison.
+    
+    Parameters
+    ----------
+    Ao : np.ndarray
+        Old/original matrix
+    An : np.ndarray
+        New matrix to compare against
+    matsize : int
+        Number of rows to plot
+    
+    Returns
+    -------
+    int
+        Status code (0 for success)
+    """
     for i in range(matsize):
         plt.figure()
         plt.subplot(211)

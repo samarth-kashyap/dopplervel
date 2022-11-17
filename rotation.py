@@ -1,3 +1,11 @@
+"""Module for rotating velocity field maps from disk center to solar north coordinates.
+
+This module handles the transformation of velocity field spherical harmonic
+coefficients and maps between different coordinate systems. It converts maps
+from disk-center coordinates to solar north pole coordinates using Euler angle
+rotations.
+"""
+
 # {{{ Library imports
 from scipy.spatial.transform import Rotation as R
 from globalvars import DopplerVars

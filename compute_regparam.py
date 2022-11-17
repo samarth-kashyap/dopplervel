@@ -1,3 +1,10 @@
+"""Module for computing regularization parameters for the inversion problem.
+
+This module provides functionality to determine optimal regularization parameters
+using L-curve analysis and generate synthetic velocity fields for testing purposes.
+It uses various synthetic excitation patterns to test the inversion process.
+"""
+
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +22,25 @@ t = args.t
 
 
 def find_knee(reglist, leastsq):
+    """Find the knee point in the L-curve for regularization parameter selection.
+    
+    The knee point represents the optimal balance between fitting the data and
+    regularization. It is found by detecting sign changes in the first derivative.
+    
+    Parameters
+    ----------
+    reglist : np.ndarray
+        Array of regularization parameter values
+    leastsq : np.ndarray
+        Array of corresponding least-squares residuals
+    
+    Returns
+    -------
+    knee : float or None
+        Regularization parameter value at the knee point
+    knee_ind : int or None
+        Index of the knee point in the arrays
+    """
     dy = leastsq[1:] - leastsq[:-1]
     dx = reglist[1:] - reglist[:-1]
     ls_d1 = dy/dx + 1
@@ -29,6 +55,31 @@ def find_knee(reglist, leastsq):
 
 
 def get_lcurve(t, regmax, Npoints, uA):
+    """Generate L-curve for regularization parameter selection.
+    
+    Computes the residual for different regularization parameters and plots
+    the L-curve. The knee of the curve indicates the optimal regularization.
+    
+    Parameters
+    ----------
+    t : int
+        Azimuthal order
+    regmax : float
+        Maximum regularization parameter value
+    Npoints : int
+        Number of points to sample in the regularization parameter space
+    uA : np.ndarray
+        Actual/true spherical harmonic coefficients
+    
+    Returns
+    -------
+    regparam_list : np.ndarray
+        Array of regularization parameter values tested
+    leastsq : np.ndarray
+        Array of corresponding RMS residuals
+    fig : matplotlib.figure.Figure
+        Figure object containing the L-curve plot
+    """
     A = np.load(f"{mat_dir}A{t:04d}.npz")['A']
     uot = A.dot(uA)
 
@@ -52,6 +103,30 @@ def get_lcurve(t, regmax, Npoints, uA):
 
 
 def generate_synthetic(excitationType, maxIndex):
+    """Generate synthetic velocity field spherical harmonic coefficients.
+    
+    Creates synthetic velocity fields with different spatial patterns for testing
+    the inversion algorithm. Supports various excitation patterns including
+    sectoral, tesseral, zonal, solar-like, and random patterns.
+    
+    Parameters
+    ----------
+    excitationType : str
+        Type of spatial pattern to generate. Options: 'sectoral', 'tesseral',
+        'zonal', 'solarlike', 'sparse', 'hathaway', or 'random'
+    maxIndex : int
+        Total number of spherical harmonic coefficients to generate,
+        typically (lmax+1)*(lmax+2)/2
+    
+    Returns
+    -------
+    ulm : np.ndarray(dtype=complex)
+        Radial component spherical harmonic coefficients
+    vlm : np.ndarray(dtype=complex)
+        Spheroidal component spherical harmonic coefficients
+    wlm : np.ndarray(dtype=complex)
+        Toroidal component spherical harmonic coefficients
+    """
     ulm = np.zeros(maxIndex, dtype=complex)
     vlm = np.zeros(maxIndex, dtype=complex)
     wlm = np.zeros(maxIndex, dtype=complex)
@@ -200,6 +275,23 @@ def generate_synthetic(excitationType, maxIndex):
 
 
 def get_lmarr(lmax):
+    """Generate arrays of spherical harmonic degree and order indices.
+    
+    Creates arrays containing the degree (ell) and azimuthal order (emm)
+    for all spherical harmonic coefficients up to lmax.
+    
+    Parameters
+    ----------
+    lmax : int
+        Maximum spherical harmonic degree
+    
+    Returns
+    -------
+    ellArr : np.ndarray(dtype=int)
+        Array of spherical harmonic degrees
+    emmArr : np.ndarray(dtype=int)
+        Array of azimuthal orders
+    """
     maxIndex = int((lmax+1)*(lmax+2)/2)
     ellArr = np.zeros(maxIndex, dtype=np.int32)
     emmArr = np.zeros(maxIndex, dtype=np.int32)

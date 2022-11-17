@@ -1,3 +1,13 @@
+"""Process Local Correlation Tracking (LCT) velocity data into spherical harmonics.
+
+This module converts LCT velocity fields from Cartesian coordinates to
+spherical harmonic coefficients. It creates HEALPix maps from the input
+velocity components and computes their spherical harmonic decomposition.
+
+The LCT data provides horizontal velocity fields on the solar surface which
+are converted to poloidal and toroidal spherical harmonic components.
+"""
+
 import numpy as np
 from astropy.io import fits
 import healpy as hp

@@ -1,3 +1,15 @@
+"""Visualize time series analysis of velocity field spherical harmonics.
+
+This module provides plotting utilities for analyzing and displaying the
+time-frequency characteristics of velocity field data. It creates diagnostic
+plots showing power spectra as functions of frequency, spherical harmonic
+degree, and azimuthal order.
+
+The module supports both Doppler velocity and LCT data visualization with
+customizable display options for different spectral components (radial,
+poloidal, toroidal).
+"""
+
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
@@ -10,6 +22,24 @@ LMAX = 375
 # LMAX = 1500
 
 def get_title(comp, var_not_summed='sigma'):
+    """Generate formatted LaTeX title string for plots.
+    
+    Creates appropriate mathematical notation for power spectrum plots
+    based on the velocity component and variable being displayed.
+    
+    Parameters
+    ----------
+    comp : int
+        Component index: 0=radial, 1=poloidal, 2=toroidal
+    var_not_summed : str, optional
+        Variable not being summed over: 'sigma', 't', or 's-|t|'
+        Default is 'sigma'
+    
+    Returns
+    -------
+    title_str : str
+        LaTeX formatted title string
+    """
     if comp==0:
         if var_not_summed == 'sigma':
             title_str = " $\\sqrt{\sum\limits_{\\ell, m} |u_{\ell m}(\sigma)|^2}$ "
@@ -34,6 +64,23 @@ def get_title(comp, var_not_summed='sigma'):
     return title_str
 
 def get_title_new(comp, var_not_summed='sigma'):
+    """Generate alternative formatted LaTeX title string for plots.
+    
+    Similar to get_title but uses different notation (s,t instead of ell,m).
+    
+    Parameters
+    ----------
+    comp : int
+        Component index: 0=radial, 1=poloidal, 2=toroidal
+    var_not_summed : str, optional
+        Variable not being summed over: 'sigma', 't', or 's-|t|'
+        Default is 'sigma'
+    
+    Returns
+    -------
+    title_str : str
+        LaTeX formatted title string with (s,t) notation
+    """
     if comp==0:
         if var_not_summed == 'sigma':
             title_str = " $\\left( {\sum\limits_{s, t} |u_{st}(\sigma)|^2 \\right)^{1/2}$ "
@@ -61,6 +108,34 @@ def get_title_new(comp, var_not_summed='sigma'):
 # {{{ analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma'):
 def analyze_blocks_plot(u, comp, num_blocks, var_not_summed='sigma', whichdata='lct',
                         figaxs=None):
+    """Create multi-panel plots analyzing power in spherical harmonic degree blocks.
+    
+    Divides the spherical harmonic degree range into blocks and creates
+    separate panels showing power distribution for each block. Supports
+    overlaying multiple datasets (e.g., LCT vs Doppler).
+    
+    Parameters
+    ----------
+    u : np.ndarray
+        Power array with shape (num_blocks, num_frequencies or num_orders)
+    comp : int
+        Component index: 0=radial, 1=poloidal, 2=toroidal
+    num_blocks : int
+        Number of spherical harmonic degree blocks to analyze
+    var_not_summed : str, optional
+        Variable displayed on x-axis: 'sigma', 't', or 's-|t|'
+    whichdata : str, optional
+        Data type identifier for styling: 'lct' or 'doppler'
+    figaxs : tuple, optional
+        Existing (fig, axs) to plot on. If None, creates new figure
+    
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure object
+    axs : np.ndarray of matplotlib.axes.Axes
+        Array of axes objects
+    """
     title_str = get_title(comp, var_not_summed)
     block_size = LMAX // num_blocks
     lmin, lmax = 0, 0

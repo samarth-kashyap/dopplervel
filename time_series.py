@@ -1,3 +1,11 @@
+"""Module for time series analysis of velocity field data.
+
+This module provides tools for loading, analyzing, and visualizing time series
+of spherical harmonic coefficients from Doppler velocity or LCT (Local Correlation
+Tracking) data. It includes functions for computing power spectra, frequency
+analysis, and generating diagnostic plots.
+"""
+
 # {{{ Library imports
 import matplotlib.pyplot as plt            # Plotting
 from heliosPy import iofuncs as cio

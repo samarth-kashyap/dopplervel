@@ -1,5 +1,16 @@
-"""Construct healPy maps using the synthetic spectrum obtained 
-by Hathaway 2015. 
+"""Construct HEALPix maps using synthetic spectra from Hathaway et al. (2015).
+
+This module creates velocity field maps from spherical harmonic coefficients
+based on the empirical power spectra reported in Hathaway et al. (2015).
+It provides functions for rotating maps and projecting them onto line-of-sight
+coordinates.
+
+References
+----------
+Hathaway, D. H., Teil, T., Norton, A. A., & Kitiashvili, I. (2015),
+"The Sun's Photospheric Convection Spectrum", ApJ 811, 105
+doi: 10.1088/0004-637X/811/2/105
+arXiv: 1508.03022
 """
 import numpy as np
 from astropy.io import fits
@@ -12,10 +23,21 @@ NSIDE = gvar.nside
 
 
 def rotate_map(hmap, rot_theta, rot_phi):
-    """
-    Take hmap (a healpix map array) and return another healpix map array 
-    which is ordered such that it has been rotated in (theta, phi) by the 
-    amounts given.
+    """Rotate a HEALPix map by specified angles in theta and phi.
+    
+    Parameters
+    ----------
+    hmap : np.ndarray
+        Input HEALPix map array
+    rot_theta : float
+        Rotation angle in theta (colatitude) direction [radians]
+    rot_phi : float
+        Rotation angle in phi (longitude) direction [radians]
+    
+    Returns
+    -------
+    rot_map : np.ndarray
+        Rotated HEALPix map
     """
     nside = hp.npix2nside(len(hmap))
 
@@ -34,6 +56,21 @@ def rotate_map(hmap, rot_theta, rot_phi):
 
 
 def create_los_map(hpmap):
+    """Create line-of-sight projection from velocity component maps.
+    
+    Projects the radial, theta, and phi components of a velocity field
+    onto the line-of-sight direction in heliographic coordinates.
+    
+    Parameters
+    ----------
+    hpmap : tuple of np.ndarray
+        Tuple containing (r_map, theta_map, phi_map) HEALPix maps
+    
+    Returns
+    -------
+    los_map : np.ndarray
+        Line-of-sight velocity HEALPix map
+    """
     theta_map, phi_map = hp.pix2ang(NSIDE, np.arange(hp.nside2npix(NSIDE)))
     data_r, data_th, data_ph = hpmap
     losr = np.sin(theta_map) * np.cos(phi_map)

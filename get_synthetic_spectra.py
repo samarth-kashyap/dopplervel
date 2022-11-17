@@ -1,3 +1,18 @@
+"""Generate synthetic velocity spectra by fitting Hathaway et al. (2015) data.
+
+This module fits polynomial functions to the observed power spectra from
+Hathaway et al. (2015) to create smooth synthetic spectra for testing
+the inversion algorithm. It performs piecewise polynomial fits to better
+capture the spectral shape.
+
+References
+----------
+Hathaway, D. H., Teil, T., Norton, A. A., & Kitiashvili, I. (2015),
+"The Sun's Photospheric Convection Spectrum", ApJ 811, 105
+doi: 10.1088/0004-637X/811/2/105
+arXiv: 1508.03022
+"""
+
 import matplotlib.pyplot as plt
 from math import sqrt, pi, e
 import numpy as np
@@ -36,22 +51,28 @@ def piecewise(pieces, Nmax):
         z = np.polyfit(ulm[pieceMin:pieceMax, 0], ulm[pieceMin:pieceMax, 1]/np.sqrt(ulm[pieceMin:pieceMax, 0]), 7)
 
 def get_fit_coefs(data, breaks, deg):
-    """
-    Fit the input curve piecewise using polynomials.
+    """Fit input curve piecewise using polynomials.
 
-    Inputs: (data, breaks, deg)
-    ----------------------------------------------------
-    data    (np.ndarray(ndim=2)) - dim=1 has data of x, 
-                                   dim=2 has data of y
-    breaks  (np.ndarray(ndim=1)) - array of indices to indicate breaks (for piecewise fitting)
-                                   E.g. breaks = np.ndarray([0, 12, 56]) then 2 different polynomials
-                                   are fitted, one for (0, 12) and another for (12, 56)
-    deg     (        int       ) - maximum degree of fitted polynomials
+    Parameters
+    ----------
+    data : np.ndarray(ndim=2)
+        Data array where column 0 contains x values and column 1 contains y values
+    breaks : np.ndarray(ndim=1, dtype=int)
+        Array of indices indicating breaks for piecewise fitting.
+        E.g., breaks = [0, 12, 56] fits two polynomials: one for indices 0-12
+        and another for indices 12-56
+    deg : int
+        Maximum degree of fitted polynomials
     
-    Outputs: (pfit)
-    ----------------------------------------------------
-    pfit    (list) - np.ndarray for each piece
-    E.g. to obtain the curve of second piece, use np.poly1d(pfit[1])
+    Returns
+    -------
+    pfit : list of np.ndarray
+        List of polynomial coefficient arrays, one for each piece.
+        Use np.poly1d(pfit[i]) to obtain the polynomial function for piece i
+    
+    Notes
+    -----
+    The function fits y/sqrt(x) vs x to better capture the spectral shape.
     """
 #    pfit = np.zeros((breaks.shape[0]-1, deg+1))
     pfit = []
@@ -80,7 +101,8 @@ def get_fit_poly(data, breaks, pfit):
     return xList, polyList
 
 if __name__=="__main__":
-    # loading the data points from Hathaway 2015.
+    # Loading the data points from Hathaway et al. (2015) - 
+    # "The Sun's Photospheric Convection Spectrum", ApJ 811, 105
     dataDir = homeDir + "dopplervel2/"
     ulm = np.loadtxt(dataDir + "green.csv", delimiter=",")          # radial spectrum
     vlm = np.loadtxt(dataDir + "red.csv", delimiter=",")            # poloidal spectrum 

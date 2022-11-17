@@ -1,3 +1,14 @@
+"""Process HMI vector magnetogram data into spherical harmonics.
+
+This module reads HMI vector magnetogram FITS files and transforms the
+magnetic field data from Cartesian to spherical coordinates, then computes
+the spherical harmonic decomposition. It handles the transformation of
+field components (Bx, By, Bz) to radial, poloidal, and toroidal components.
+
+The module supports creating HEALPix maps and computing line-of-sight
+projections for comparison with observed magnetograms.
+"""
+
 # {{{ Library imports
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,3 +1,10 @@
+"""Module for handling spherical harmonic conventions and transformations.
+
+This module provides utilities for working with HEALPix maps and vector spherical
+harmonics. It includes functions for generating synthetic maps, computing spin-1
+transformations, and calculating power spectra.
+"""
+
 import numpy as np
 import healpy as hp
 
@@ -11,6 +18,21 @@ NPIX = hp.nside2npix(NSIDE)
 
 # {{{ def get_synth_maps():
 def get_synth_maps():
+    """Generate synthetic HEALPix maps for testing.
+    
+    Creates synthetic velocity field maps with random spherical harmonic
+    coefficients for radial and horizontal components. The maps are made
+    real by removing imaginary parts through a forward-backward transformation.
+    
+    Returns
+    -------
+    r_map : np.ndarray
+        HEALPix map of the radial velocity component
+    h1map : np.ndarray
+        HEALPix map of the first horizontal component
+    h2map : np.ndarray
+        HEALPix map of the second horizontal component
+    """
     ulm_t1 = np.sqrt((np.random.rand(len(ellArr)) - 0.5 +
                       1j*(np.random.rand(len(ellArr)) - 0.5)) *
                      (lmax**2 - (ellArr-50)**2))
