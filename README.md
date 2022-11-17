@@ -6,9 +6,7 @@
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-<p align="center">
-  <img src="imgs/dopplervel.png" alt="DopplerVel: Solar Velocity Field Analysis Toolkit" width="100%">
-</p>
+![dopplervel: solar surface convection analysis](./imgs/dopplervel.png)
 
 A comprehensive Python toolkit for processing HMI Dopplergrams and LCT velocity data to analyze solar surface convective flows through spherical harmonic decomposition.
 
